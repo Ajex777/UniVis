@@ -1,0 +1,192 @@
+.brand,
+.panel,
+.form-card,
+.source-panel {
+  border: 1px solid var(--line);
+  background: var(--panel);
+  border-radius: 8px;
+}
+
+.brand {
+  padding: 14px 16px;
+}
+
+.brand h1 {
+  margin: 0;
+  font-size: 24px;
+}
+
+.brand p,
+.meta {
+  color: var(--muted);
+  margin: 4px 0 0;
+  font-size: 13px;
+}
+
+.source-panel,
+.form-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+}
+
+.source-panel label {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.source-panel input,
+.source-panel select,
+.camera-title select,
+.form-card textarea {
+  width: 100%;
+  min-width: 0;
+}
+
+.list-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.episode-list {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 8px;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
+.episode-button,
+.primary,
+.ghost,
+.link-button {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.episode-button {
+  position: relative;
+  overflow: hidden;
+  min-height: 70px;
+  padding: 12px;
+  text-align: left;
+  background: var(--panel-solid);
+}
+
+.episode-button.converting {
+  background: linear-gradient(90deg, var(--converted) var(--progress), var(--panel-solid) var(--progress));
+}
+
+.episode-button.converted {
+  background: rgba(20, 120, 95, 0.18);
+}
+
+.episode-button.rejected {
+  background: rgba(155, 47, 63, 0.14);
+}
+
+.episode-button.active {
+  border-color: rgba(20, 120, 95, 0.55);
+  box-shadow: inset 4px 0 0 var(--accent);
+}
+
+.status-pill {
+  display: inline-block;
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.panel {
+  min-height: 0;
+  padding: 10px;
+}
+
+.camera-card {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.camera-card img {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  object-fit: cover;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #e5ecef;
+}
+
+.camera-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.plot {
+  width: 100%;
+  height: 100%;
+}
+
+.timeline {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 12px;
+}
+
+.timeline input {
+  width: 100%;
+}
+
+.speed-row,
+.status-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.speed-row {
+  grid-column: 1 / -1;
+  justify-content: center;
+}
+
+.primary,
+.ghost,
+.link-button {
+  padding: 9px 12px;
+  background: var(--panel-solid);
+}
+
+.link-button {
+  padding: 4px 8px;
+  color: var(--accent);
+}
+
+.primary {
+  color: #fff;
+  background: var(--accent);
+}
+
+.ghost.selected,
+.status-row button.selected {
+  border-color: var(--accent);
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.gripper-chart {
+  width: 100%;
+  height: 82px;
+}
+
+.reason {
+  color: var(--danger);
+  font-size: 13px;
+}

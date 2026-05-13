@@ -1,0 +1,56 @@
+.app {
+  display: grid;
+  grid-template-columns: 290px minmax(0, 1fr) 340px;
+  gap: 12px;
+  height: 100%;
+  padding: 12px;
+}
+
+.sidebar,
+.inspector,
+.stage {
+  min-height: 0;
+}
+
+.sidebar,
+.inspector {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.stage {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) 148px;
+  gap: 12px;
+}
+
+.viewer-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.04fr) minmax(420px, 0.96fr);
+  gap: 12px;
+  min-height: 0;
+}
+
+.camera-panel {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) minmax(0, 0.72fr);
+  gap: 10px;
+}
+
+.wrist-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  min-height: 0;
+}
+
+@media (max-width: 1180px) {
+  .app {
+    grid-template-columns: 230px minmax(0, 1fr);
+  }
+
+  .inspector {
+    display: none;
+  }
+}
