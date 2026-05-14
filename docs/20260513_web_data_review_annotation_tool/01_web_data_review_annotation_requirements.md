@@ -67,6 +67,25 @@ LeForge 中已有可参考能力：
 - `language_prompt`
 - `chunks`
 
+### 5.1.1 浏览器目录选择与上传策略
+
+正式数据源入口采用“前端选择本地目录，上传给 server，server 在本地 staging workspace 解析”的模式。浏览器不会把用户本机目录的绝对路径可靠暴露给网页，因此不应把手填 server path 作为主产品路径。
+
+推荐流程：
+
+1. 前端使用目录选择控件读取用户选中的目录文件列表，保留每个文件的相对路径。
+2. 前端通过 multipart upload 或分片 upload 将文件上传到 server。
+3. Server 在受控 staging 目录下重建相对目录结构，并创建 `UploadedDataset` 记录。
+4. Server 根据用户选择的 input adapter 调用 `scan/load_metadata/load_episode`。
+5. 后续可视化、标注、转换都基于 server staging 中的数据副本进行。
+
+实现注意：
+
+- 上传目录需要保留 relative path，避免丢失 raw episode/HDF5 目录结构。
+- 大数据集应支持分片上传、断点/重试、上传进度和取消。
+- Server path 输入只可作为开发调试或同机部署的可选快捷方式，不作为默认用户流程。
+- 上传后的 staging 数据应有清理策略，避免长时间占用磁盘。
+
 ### 5.2 输出数据
 
 工具应输出：
@@ -83,20 +102,21 @@ LeForge 中已有可参考能力：
 
 ### 6.1 原始数据审查后单条转换
 
-1. 用户选择原始 episode 根目录。
-2. Server 扫描 episode 列表，并给出每条状态：未审查、已标注、已转换、转换失败、已过滤。
-3. 用户打开某条 episode。
-4. Server 通过 `RawEpisodeAdapter` 将原始数据同步为 `PolicyEpisode`，前端可视化的是帧同步后的 `PolicyEpisode`。
-5. 用户播放/暂停/拖动时间轴，检查左右腕相机、轨迹和夹爪。
-6. 用户填写或修改语言标注。
-7. 用户选择保留/丢弃，并可填写原因标签和备注。
-8. 用户点击“转换当前 episode”。
-9. Server 使用 `RawEpisodeAdapter -> PolicyEpisode -> EpisodeExporter` 链路导出 HDF5。
-10. 转换完成后可通过 `HDF5EpisodeAdapter` 重新加载 HDF5 并复查，或留在当前列表继续下一条。
+1. 用户在网页端选择原始 episode 根目录。
+2. 前端上传目录内容到 server staging workspace，并保留相对路径。
+3. Server 扫描 uploaded dataset 的 episode 列表，并给出每条状态：未审查、已标注、已转换、转换失败、已过滤。
+4. 用户打开某条 episode。
+5. Server 通过 `RawEpisodeAdapter` 将原始数据同步为 `PolicyEpisode`，前端可视化的是帧同步后的 `PolicyEpisode`。
+6. 用户播放/暂停/拖动时间轴，检查左右腕相机、轨迹和夹爪。
+7. 用户填写或修改语言标注。
+8. 用户选择保留/丢弃，并可填写原因标签和备注。
+9. 用户点击“转换当前 episode”。
+10. Server 使用 `RawEpisodeAdapter -> PolicyEpisode -> EpisodeExporter` 链路导出 HDF5。
+11. 转换完成后可通过 `HDF5EpisodeAdapter` 重新加载 HDF5 并复查，或留在当前列表继续下一条。
 
 ### 6.2 不可视化直接批量转换
 
-1. 用户选择原始根目录和输出目录。
+1. 用户在网页端选择原始根目录并上传到 server，或选择已上传的数据集。
 2. 用户配置转换参数：pattern、tolerance、min_frames、frames_per_chunk、downsample、gripper 范围等。
 3. 用户选择语言标注来源：原始 `instructions.json`、批量默认 prompt、已有 sidecar。
 4. Server 创建批量转换任务。
@@ -105,7 +125,7 @@ LeForge 中已有可参考能力：
 
 ### 6.3 已转换 HDF5 复查
 
-1. 用户选择 HDF5 文件或目录。
+1. 用户在网页端选择 HDF5 文件或目录并上传到 server，或选择已上传的 HDF5 数据集。
 2. Server 通过 `HDF5EpisodeAdapter` 将 HDF5 读取为 `PolicyEpisode`。
 3. 前端提供多文件切换、播放、帧跳转、速度控制、局部轨迹窗口。
 4. 用户可查看或修改语言标注。
@@ -125,7 +145,9 @@ LeForge 中已有可参考能力：
 ### 7.1 项目与数据源管理
 
 - 支持创建 review project，绑定一个或多个数据源。
-- 支持数据源类型：raw episode root、single raw episode、HDF5 directory、single HDF5。
+- 支持数据源类型：uploaded raw episode root、uploaded single raw episode、uploaded HDF5 directory、uploaded single HDF5。
+- 支持浏览器目录选择和上传，server 按相对路径重建 staging 数据集。
+- 支持上传进度、失败重试、取消和上传完成后的扫描结果展示。
 - 支持限制可访问根目录，避免网页端任意读取系统路径。
 - 支持自然排序 episode 文件，例如 `episode1, episode2, episode10`。
 - 支持重新扫描数据源，并保留已有标注。
@@ -194,6 +216,7 @@ LeForge 中已有可参考能力：
 - Server 端应缓存 HDF5 metadata、trajectory、最近访问帧、相邻 episode。
 - 视频帧输出优先考虑 JPEG/WebP；需要精确调试时支持 PNG。
 - 前端时间轴拖动时应节流，避免每个鼠标事件都触发重解码。
+- 大目录上传需要支持进度显示和分批提交；第一版可以先实现小型 HDF5 目录的单次 multipart 上传，后续再扩展分片上传。
 - 以单条 episode 为转换单位时，`PolicyEpisode` 可以先采用当前 HDF5 转换类似的全量 episode 内存模式；如果后续遇到大 episode 内存压力，再扩展懒加载/流式 frame provider。
 
 ### 8.2 稳定性
@@ -334,6 +357,14 @@ HDF5 exporter 的实现应先独立验证：给定一个小型 `PolicyEpisode` f
 - `POST /api/projects`
 - `GET /api/projects/{project_id}`
 - `PATCH /api/projects/{project_id}`
+
+### 10.1.1 Uploads
+
+- `POST /api/uploads/datasets`：创建上传会话，声明 input adapter、目录名、文件数量和总大小。
+- `POST /api/uploads/{upload_id}/files`：上传单个文件或一批文件，保留 relative path。
+- `POST /api/uploads/{upload_id}/complete`：完成上传，server 重建 staging 数据集并触发扫描。
+- `GET /api/uploads/{upload_id}`：查询上传进度、错误和 staging 路径。
+- `DELETE /api/uploads/{upload_id}`：取消上传并清理 staging 数据。
 
 ### 10.2 Dataset / Episode
 
@@ -508,7 +539,7 @@ HDF5 exporter 的实现应先独立验证：给定一个小型 `PolicyEpisode` f
 - IK 实现：第一版先用 dexechain/Piper 逻辑，封装为 `PiperDexechainReachabilityBackend`。
 - Reachability report：第一版只要求能被当前 Web 工具消费。
 - 多人协作：暂不考虑，必要时通过拆分数据集并行处理。
-- 数据根目录：由用户在网页端以目录选择的形式选择。
+- 数据根目录：由用户在网页端以目录选择的形式选择，并上传到 server staging 后解析；server path 只作为开发调试快捷入口，不作为正式主流程。
 - 项目形态：计划独立成单独仓库或 Python package。
 
 ## 16. 当前推荐方案

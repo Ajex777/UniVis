@@ -77,6 +77,7 @@
         onChange: props.onDirectoryChange,
       }),
       h("p", { className: "meta" }, props.directoryLabel || "No directory selected"),
+      h("button", { className: "primary", onClick: props.onUploadSource }, "Upload"),
       h("label", null, "Input format"),
       h("select", {
         value: props.inputFormat,

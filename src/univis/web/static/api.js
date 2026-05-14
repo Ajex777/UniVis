@@ -6,7 +6,16 @@
    */
   async function fetchJson(url, options) {
     const response = await fetch(url, options);
-    if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
+    if (!response.ok) {
+      let detail = `${response.status} ${response.statusText}`;
+      try {
+        const payload = await response.json();
+        detail = payload.detail || detail;
+      } catch (_error) {
+        detail = `${response.status} ${response.statusText}`;
+      }
+      throw new Error(detail);
+    }
     return response.json();
   }
 

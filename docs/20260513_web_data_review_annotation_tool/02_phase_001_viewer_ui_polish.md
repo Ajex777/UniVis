@@ -6,7 +6,7 @@
 
 ## Scope
 
-- 增加 client 端本地目录选择入口。
+- 增加 client 端本地目录选择入口。第一版只验证选择交互；后续真实数据接入必须走“目录文件上传到 server staging 后解析”，不能依赖浏览器提供绝对路径。
 - 增加输入数据格式和输出数据格式下拉框，选项来自后端 registry API，后续与 adapter/exporter class 注册对应。
 - 左侧 episode 列表支持滚动、折叠、点击切换 episode。
 - episode item 用颜色表达转换状态：白色未转换，红色被拒绝，绿色转换完成，转换中用绿色占比表达进度。
@@ -35,3 +35,7 @@
 - 不读取真实本地目录内容到 server。
 - 不执行真实转换。
 - 不接真实 adapter/exporter class。
+
+## Follow-up Decision
+
+真实数据源入口采用浏览器目录选择 + 文件上传。前端应上传文件内容和相对路径，server 在 staging workspace 重建目录结构并交给对应 adapter 扫描。`Server path` 仅可作为开发调试捷径，不作为正式用户路径。

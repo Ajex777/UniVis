@@ -94,4 +94,6 @@ def test_registry_endpoint() -> None:
     assert response.status_code == 200
     payload = response.json()
     assert payload["input_adapters"][0]["name"] == "FakePolicyEpisodeAdapter"
+    assert payload["input_adapters"][1]["name"] == "HDF5EpisodeAdapter"
     assert payload["output_exporters"][0]["name"] == "HDF5EpisodeExporter"
+    assert payload["reachability_backends"][0]["name"] == "MockReachabilityBackend"

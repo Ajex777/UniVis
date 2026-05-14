@@ -44,6 +44,12 @@
   min-width: 0;
 }
 
+.source-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 6px;
+}
+
 .list-header {
   display: flex;
   align-items: center;

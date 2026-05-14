@@ -2,12 +2,28 @@
 
 from __future__ import annotations
 
+from pydantic import BaseModel
 from fastapi import APIRouter, HTTPException, Response
 
-from univis.data.fake_policy_episode import FakePolicyEpisodeRepository
+from univis.core.components import ComponentRegistry
+from univis.core.episode_session import EpisodeSession
 from univis.domain.policy_episode import Annotation
 from univis.utils.color import color_for_key
 from univis.utils.image_svg import make_camera_svg
+
+
+class SourceSelectionRequest(BaseModel):
+    """Request payload for switching episode source.
+
+    Inputs:
+        input_adapter: Registered adapter component name.
+        root_path: Optional server-local file or directory path.
+    Output:
+        Validated source selection payload for route handlers.
+    """
+
+    input_adapter: str
+    root_path: str = ""
 
 
 class Phase00Router:
@@ -19,16 +35,22 @@ class Phase00Router:
         A configured FastAPI router mounted by the application factory.
     """
 
-    def __init__(self, repository: FakePolicyEpisodeRepository) -> None:
+    def __init__(
+        self,
+        session: EpisodeSession,
+        registry: ComponentRegistry,
+    ) -> None:
         """Initialize the router and register endpoints.
 
         Inputs:
-            repository: Data source for fake episodes and annotations.
+            session: Current episode source context.
+            registry: Component registry for adapter/exporter/backend metadata.
         Output:
             Router instance accessible through `self.router`.
         """
 
-        self.repository = repository
+        self.session = session
+        self.registry = registry
         self.router = APIRouter(prefix="/api")
         self._register()
 
@@ -43,6 +65,7 @@ class Phase00Router:
 
         self.router.add_api_route("/episodes", self.list_episodes, methods=["GET"])
         self.router.add_api_route("/registry", self.get_registry, methods=["GET"])
+        self.router.add_api_route("/source", self.set_source, methods=["POST"])
         self.router.add_api_route(
             "/episodes/{episode_id}/metadata",
             self.get_metadata,
@@ -74,10 +97,10 @@ class Phase00Router:
         """
 
         items: list[dict] = []
-        for meta in self.repository.list_metadata():
-            item = meta.model_dump()
-            item["conversion"] = self.repository.conversion_state(meta.episode_id)
-            items.append(item)
+        try:
+            items = self.session.list_episodes()
+        except Exception as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
         return items
 
     def get_registry(self) -> dict:
@@ -90,32 +113,24 @@ class Phase00Router:
             class registration model without importing real adapters yet.
         """
 
-        return {
-            "input_adapters": [
-                {
-                    "name": "FakePolicyEpisodeAdapter",
-                    "label": "Fake PolicyEpisode",
-                    "description": "In-memory fake data for Phase 001.",
-                },
-                {
-                    "name": "HDF5EpisodeAdapter",
-                    "label": "HDF5 Episode",
-                    "description": "Planned adapter for converted HDF5 files.",
-                },
-                {
-                    "name": "PikaRawEpisodeAdapter",
-                    "label": "PIKA Raw",
-                    "description": "Planned adapter for PIKA raw episode folders.",
-                },
-            ],
-            "output_exporters": [
-                {
-                    "name": "HDF5EpisodeExporter",
-                    "label": "Compressed HDF5",
-                    "description": "Planned first exporter implementation.",
-                }
-            ],
-        }
+        return self.registry.api_payload()
+
+    def set_source(self, request: SourceSelectionRequest) -> dict:
+        """Switch the active episode source.
+
+        Inputs:
+            request: Adapter name and optional server-local root path.
+        Output:
+            Active source summary and fresh episode list.
+        """
+
+        root_path = request.root_path.strip() or None
+        try:
+            source = self.session.set_source(request.input_adapter, root_path)
+            episodes = self.session.list_episodes()
+        except Exception as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        return {"source": source, "episodes": episodes}
 
     def get_metadata(self, episode_id: str) -> dict:
         """Return metadata for a selected episode.
@@ -127,9 +142,11 @@ class Phase00Router:
         """
 
         try:
-            return self.repository.get_metadata(episode_id).model_dump()
+            return self.session.get_metadata(episode_id).model_dump()
         except KeyError as exc:
             raise HTTPException(status_code=404, detail="episode not found") from exc
+        except Exception as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     def get_trajectory(self, episode_id: str) -> dict:
         """Return synchronized trajectory arrays for visualization.
@@ -142,9 +159,11 @@ class Phase00Router:
         """
 
         try:
-            episode = self.repository.get_episode(episode_id)
+            episode = self.session.get_episode(episode_id)
         except KeyError as exc:
             raise HTTPException(status_code=404, detail="episode not found") from exc
+        except Exception as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
 
         frames = episode.frames
         return {
@@ -171,9 +190,11 @@ class Phase00Router:
         """
 
         try:
-            saved = self.repository.update_annotation(episode_id, annotation)
+            saved = self.session.update_annotation(episode_id, annotation)
         except KeyError as exc:
             raise HTTPException(status_code=404, detail="episode not found") from exc
+        except Exception as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
         return saved.model_dump()
 
     def get_camera_frame(
@@ -193,9 +214,11 @@ class Phase00Router:
         """
 
         try:
-            meta = self.repository.get_metadata(episode_id)
+            meta = self.session.get_metadata(episode_id)
         except KeyError as exc:
             raise HTTPException(status_code=404, detail="episode not found") from exc
+        except Exception as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
 
         camera = next((cam for cam in meta.cameras if cam.key == camera_key), None)
         if camera is None:

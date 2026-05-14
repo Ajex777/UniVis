@@ -25,6 +25,7 @@ function App() {
   const [inputFormat, setInputFormat] = useState("FakePolicyEpisodeAdapter");
   const [outputFormat, setOutputFormat] = useState("HDF5EpisodeExporter");
   const [directoryLabel, setDirectoryLabel] = useState("");
+  const [directoryFiles, setDirectoryFiles] = useState([]);
   useTrajectoryPlot("trajectory-plot", trajectory, frameIndex);
 
   useEffect(() => {
@@ -77,10 +78,52 @@ function App() {
     setMessage("Annotation saved");
   };
 
+  const uploadSource = async () => {
+    try {
+      if (!directoryFiles.length) {
+        setMessage("Choose a local directory first");
+        return;
+      }
+      const totalSize = directoryFiles.reduce((sum, file) => sum + file.size, 0);
+      const first = directoryFiles[0]?.webkitRelativePath || directoryFiles[0]?.name || "";
+      const root = first.includes("/") ? first.split("/")[0] : "selected directory";
+      setMessage(`Uploading ${directoryFiles.length} file(s)...`);
+      const upload = await fetchJson("/api/uploads/datasets", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          input_adapter: inputFormat,
+          root_label: root,
+          file_count: directoryFiles.length,
+          total_size: totalSize,
+        }),
+      });
+      const formData = new FormData();
+      directoryFiles.forEach((file) => {
+        formData.append("files", file, file.name);
+        formData.append("relative_paths", file.webkitRelativePath || file.name);
+      });
+      await fetchJson(`/api/uploads/${upload.upload_id}/files`, {
+        method: "POST",
+        body: formData,
+      });
+      const payload = await fetchJson(`/api/uploads/${upload.upload_id}/complete`, {
+        method: "POST",
+      });
+      const items = payload.episodes || [];
+      setEpisodes(items);
+      setEpisodeId(items[0]?.episode_id || "");
+      setMessage(`Loaded ${items.length} episode(s)`);
+    } catch (error) {
+      setMessage(error.message);
+    }
+  };
+
   const onDirectoryChange = (event) => {
     const files = Array.from(event.target.files || []);
     const first = files[0]?.webkitRelativePath || files[0]?.name || "";
     const root = first.includes("/") ? first.split("/")[0] : "selected directory";
+    setDirectoryFiles(files);
     setDirectoryLabel(files.length ? `${root} · ${files.length} files selected` : "");
   };
 
@@ -101,6 +144,7 @@ function App() {
         onDirectoryChange,
         onInputFormat: setInputFormat,
         onOutputFormat: setOutputFormat,
+        onUploadSource: uploadSource,
       }),
       h("div", { className: "list-header" },
         h("strong", null, "Episodes"),

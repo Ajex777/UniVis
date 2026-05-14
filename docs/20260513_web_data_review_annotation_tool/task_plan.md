@@ -11,11 +11,15 @@
 | Draft requirements document | complete | Included user flows, architecture, data model, APIs, IK feasibility, milestones, open questions. |
 | Validate and summarize | complete | Checked generated docs and report paths. |
 | Incorporate user annotations | complete | Converted answers into confirmed decisions and split phase work/acceptance into standalone docs. |
+| Phase 00 fake viewer | complete | Built FastAPI + React fake `PolicyEpisode` viewer in `/home/dex/app/UniVis`. |
+| Phase 001 viewer polish | complete | Added directory picker placeholder, component-driven format selectors, episode status/progress list, autoplay, and layout fixes. |
+| Phase 01 core abstractions | complete | Added adapter/exporter/reachability base classes, mock implementations, registry, model validation, and tests. |
+| Phase 02 HDF5 foundation | in progress | Round-trip HDF5 adapter/exporter, prompt writeback, and browser directory upload to server staging are complete; real compressed image serving remains. |
 
 ## Decisions
 | Topic | Decision |
 | --- | --- |
-| Doc location | `my_docs/20260513_web_data_review_annotation_tool/` |
+| Doc location | `/home/dex/app/UniVis/docs/20260513_web_data_review_annotation_tool/` |
 | Output language | Chinese, because the product discussion is in Chinese. |
 
 ## Errors Encountered
