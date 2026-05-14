@@ -1,16 +1,18 @@
 """Tests for Phase 02 HDF5 adapter and exporter."""
 
+from io import BytesIO
 from pathlib import Path
 
 import numpy as np
 from fastapi.testclient import TestClient
+from PIL import Image
 
 from univis.adapters.base import EpisodeSource
-from univis.adapters.fake_policy_episode import FakePolicyEpisodeAdapter
 from univis.adapters.hdf5 import HDF5EpisodeAdapter
 from univis.app import create_app
 from univis.exporters.hdf5 import HDF5EpisodeExporter
 from univis.utils.hdf5_episode import frames_to_qpos
+from hdf5_fixtures import make_episode, write_script_hdf5
 
 
 def test_policy_episode_hdf5_round_trip(tmp_path: Path) -> None:
@@ -22,7 +24,7 @@ def test_policy_episode_hdf5_round_trip(tmp_path: Path) -> None:
         Assertions that metadata, cameras, prompt, and qpos rows survive.
     """
 
-    episode = FakePolicyEpisodeAdapter().load_episode("fake-dual")
+    episode = make_episode("round-trip")
     result = HDF5EpisodeExporter().export(episode, tmp_path)
     adapter = HDF5EpisodeAdapter()
     loaded = adapter.load_episode(
@@ -50,15 +52,52 @@ def test_hdf5_adapter_lists_directory_naturally(tmp_path: Path) -> None:
         Assertions that episode2 sorts before episode10.
     """
 
-    fake = FakePolicyEpisodeAdapter().load_episode("fake-single")
+    base_episode = make_episode()
     exporter = HDF5EpisodeExporter()
     for episode_id in ("episode10", "episode2"):
-        episode = fake.model_copy(deep=True)
+        episode = base_episode.model_copy(deep=True)
         episode.metadata.episode_id = episode_id
         exporter.export(episode, tmp_path)
 
     items = HDF5EpisodeAdapter().list_metadata(EpisodeSource(root_path=tmp_path))
     assert [item.episode_id for item in items] == ["episode2", "episode10"]
+
+
+def test_hdf5_source_validation_rejects_empty_and_nested_dirs(tmp_path: Path) -> None:
+    """Verify HDF5 adapter validates single-level directory layout."""
+
+    adapter = HDF5EpisodeAdapter()
+    empty = tmp_path / "empty"
+    nested = tmp_path / "nested"
+    empty.mkdir()
+    (nested / "child").mkdir(parents=True)
+    write_script_hdf5(nested / "child" / "episode_nested.hdf5")
+
+    empty_result = adapter.validate_source(EpisodeSource(root_path=empty))
+    nested_result = adapter.validate_source(EpisodeSource(root_path=nested))
+
+    assert empty_result.valid is False
+    assert "top level" in empty_result.message
+    assert nested_result.valid is False
+    assert "one directory level" in nested_result.message
+
+
+def test_source_validation_api_does_not_switch_source(tmp_path: Path) -> None:
+    """Verify validation can run before source switching."""
+
+    hdf5_path = tmp_path / "valid_episode.hdf5"
+    write_script_hdf5(hdf5_path)
+    client = TestClient(create_app())
+
+    valid = client.post(
+        "/api/source/validate",
+        json={"input_adapter": "HDF5EpisodeAdapter", "root_path": str(tmp_path)},
+    )
+    assert valid.status_code == 200
+    assert valid.json()["valid"] is True
+    assert valid.json()["episode_count"] == 1
+
+    assert client.get("/api/episodes").json() == []
 
 
 def test_hdf5_language_prompt_writeback(tmp_path: Path) -> None:
@@ -70,7 +109,7 @@ def test_hdf5_language_prompt_writeback(tmp_path: Path) -> None:
         Assertions that reloaded metadata sees the new prompt.
     """
 
-    episode = FakePolicyEpisodeAdapter().load_episode("fake-single")
+    episode = make_episode("prompt-test")
     result = HDF5EpisodeExporter().export(episode, tmp_path)
     path = Path(result.output_path)
 
@@ -91,8 +130,8 @@ def test_api_can_switch_to_hdf5_source(tmp_path: Path) -> None:
         update work through the common API endpoints.
     """
 
-    episode = FakePolicyEpisodeAdapter().load_episode("fake-dual")
-    HDF5EpisodeExporter().export(episode, tmp_path)
+    hdf5_path = tmp_path / "script_episode.hdf5"
+    write_script_hdf5(hdf5_path)
     client = TestClient(create_app())
 
     response = client.post(
@@ -100,19 +139,22 @@ def test_api_can_switch_to_hdf5_source(tmp_path: Path) -> None:
         json={"input_adapter": "HDF5EpisodeAdapter", "root_path": str(tmp_path)},
     )
     assert response.status_code == 200
-    assert response.json()["episodes"][0]["episode_id"] == episode.metadata.episode_id
+    episode_id = response.json()["episodes"][0]["episode_id"]
+    assert episode_id == "script_episode"
 
-    trajectory = client.get(f"/api/episodes/{episode.metadata.episode_id}/trajectory")
+    trajectory = client.get(f"/api/episodes/{episode_id}/trajectory")
     assert trajectory.status_code == 200
-    assert len(trajectory.json()["left_xyz"]) == episode.metadata.num_frames
+    assert len(trajectory.json()["left_xyz"]) == 4
 
-    camera_key = episode.metadata.cameras[0].key
-    frame = client.get(f"/api/episodes/{episode.metadata.episode_id}/frame/{camera_key}/0")
+    frame = client.get(f"/api/episodes/{episode_id}/frame/cam_left_wrist/2")
     assert frame.status_code == 200
-    assert frame.headers["content-type"].startswith("image/svg+xml")
+    assert frame.headers["content-type"].startswith("image/png")
+    image = Image.open(BytesIO(frame.content)).convert("RGB")
+    assert image.size == (8, 6)
+    assert image.getpixel((0, 0)) == (60, 42, 22)
 
     updated = client.patch(
-        f"/api/episodes/{episode.metadata.episode_id}/annotation",
+        f"/api/episodes/{episode_id}/annotation",
         json={
             "language_prompt": "api hdf5 prompt",
             "review_status": "accepted",
@@ -121,7 +163,7 @@ def test_api_can_switch_to_hdf5_source(tmp_path: Path) -> None:
         },
     )
     assert updated.status_code == 200
-    metadata = client.get(f"/api/episodes/{episode.metadata.episode_id}/metadata")
+    metadata = client.get(f"/api/episodes/{episode_id}/metadata")
     assert metadata.json()["annotation"]["language_prompt"] == "api hdf5 prompt"
 
 
@@ -137,9 +179,9 @@ def test_api_can_upload_hdf5_directory_and_scan(tmp_path: Path) -> None:
 
     source_dir = tmp_path / "source"
     upload_root = tmp_path / "uploads"
-    episode = FakePolicyEpisodeAdapter().load_episode("fake-single")
-    result = HDF5EpisodeExporter().export(episode, source_dir)
-    hdf5_path = Path(result.output_path)
+    source_dir.mkdir()
+    hdf5_path = source_dir / "uploaded_script_episode.hdf5"
+    write_script_hdf5(hdf5_path)
     client = TestClient(create_app(uploads_root=upload_root))
 
     created = client.post(
@@ -166,10 +208,42 @@ def test_api_can_upload_hdf5_directory_and_scan(tmp_path: Path) -> None:
     completed = client.post(f"/api/uploads/{upload_id}/complete")
     assert completed.status_code == 200
     episodes = completed.json()["episodes"]
-    assert episodes[0]["episode_id"] == episode.metadata.episode_id
+    assert episodes[0]["episode_id"] == "uploaded_script_episode"
 
-    metadata = client.get(f"/api/episodes/{episode.metadata.episode_id}/metadata")
+    metadata = client.get("/api/episodes/uploaded_script_episode/metadata")
     assert metadata.status_code == 200
-    assert metadata.json()["annotation"]["language_prompt"] == (
-        episode.metadata.annotation.language_prompt
+    assert metadata.json()["annotation"]["language_prompt"] == "script compatible prompt"
+
+    frame = client.get("/api/episodes/uploaded_script_episode/frame/cam_right_wrist/1")
+    assert frame.status_code == 200
+    assert frame.headers["content-type"].startswith("image/png")
+
+
+def test_upload_rejects_input_format_mismatch(tmp_path: Path) -> None:
+    """Verify upload completion rejects non-HDF5 source for HDF5 adapter."""
+
+    source_file = tmp_path / "notes.txt"
+    source_file.write_text("not hdf5", encoding="utf-8")
+    client = TestClient(create_app(uploads_root=tmp_path / "uploads"))
+
+    created = client.post(
+        "/api/uploads/datasets",
+        json={
+            "input_adapter": "HDF5EpisodeAdapter",
+            "root_label": "bad_upload",
+            "file_count": 1,
+            "total_size": source_file.stat().st_size,
+        },
     )
+    upload_id = created.json()["upload_id"]
+    with source_file.open("rb") as file_obj:
+        uploaded = client.post(
+            f"/api/uploads/{upload_id}/files",
+            data={"relative_paths": f"bad_upload/{source_file.name}"},
+            files={"files": (source_file.name, file_obj, "text/plain")},
+        )
+    assert uploaded.status_code == 200
+
+    completed = client.post(f"/api/uploads/{upload_id}/complete")
+    assert completed.status_code == 400
+    assert "HDF5 source" in completed.json()["detail"]

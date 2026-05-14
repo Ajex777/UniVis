@@ -20,7 +20,7 @@
    * Input: slot metadata, selected camera, and current frame.
    * Output: React element containing a selector and generated image.
    */
-  function CameraCard({ title, cameras, cameraKey, onChange, episodeId, frameIndex }) {
+  function CameraCard({ title, cameras, cameraKey, onChange, frameIndex, imageUrl }) {
     return h("div", { className: "camera-card" },
       h("div", { className: "camera-title" },
         h("span", null, title),
@@ -31,10 +31,10 @@
           h("option", { key: camera.key, value: camera.key }, camera.label),
         )),
       ),
-      cameraKey ? h("img", {
+      cameraKey && imageUrl ? h("img", {
         alt: `${cameraKey} frame ${frameIndex}`,
-        src: window.UniVisApi.frameUrl(episodeId, cameraKey, frameIndex),
-      }) : null,
+        src: imageUrl,
+      }) : h("div", { className: "camera-placeholder" }),
     );
   }
 
@@ -67,17 +67,33 @@
    */
   function SourceControls(props) {
     const registry = props.registry || { input_adapters: [], output_exporters: [] };
+    const sources = props.uploadSources || [];
     return h("div", { className: "source-panel" },
-      h("label", null, "Local directory"),
-      h("input", {
-        type: "file",
-        webkitdirectory: "true",
-        directory: "true",
-        multiple: true,
-        onChange: props.onDirectoryChange,
-      }),
+      h("label", null, "Local source"),
+      h("div", { className: "source-row" },
+        h("button", { className: "ghost", onClick: props.onPickDirectory }, "Choose directory"),
+        h("button", { className: "ghost", onClick: props.onPickFile }, "Choose file"),
+      ),
       h("p", { className: "meta" }, props.directoryLabel || "No directory selected"),
+      props.sourceMessage ? h("p", { className: "source-message" }, props.sourceMessage) : null,
       h("button", { className: "primary", onClick: props.onUploadSource }, "Upload"),
+      h("label", null, "Uploaded sources"),
+      h("div", { className: "source-row" },
+        h("select", {
+          value: props.selectedUploadId,
+          onChange: (event) => props.onSelectedUploadId(event.target.value),
+          disabled: !sources.length,
+        }, sources.length ? sources.map((item) =>
+          h("option", { key: item.upload_id, value: item.upload_id },
+            `${item.root_label || item.upload_id} · ${item.received_files} file(s)`,
+          ),
+        ) : h("option", { value: "" }, "No uploaded sources")),
+        h("button", {
+          className: "ghost",
+          onClick: props.onActivateUploadSource,
+          disabled: !props.selectedUploadId,
+        }, "Load"),
+      ),
       h("label", null, "Input format"),
       h("select", {
         value: props.inputFormat,

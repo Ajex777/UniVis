@@ -28,7 +28,7 @@ class ComponentRegistry:
     """In-memory registry for pluggable UniVis components.
 
     Inputs:
-        input_adapters: Registered raw/HDF5/fake episode adapters.
+        input_adapters: Registered raw/HDF5 episode adapters.
         output_exporters: Registered output format exporters.
         reachability_backends: Registered reachability implementations.
     Output:

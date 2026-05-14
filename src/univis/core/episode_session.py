@@ -5,8 +5,11 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-from univis.adapters.base import EpisodeSource, RawEpisodeAdapter
-from univis.adapters.fake_policy_episode import FakePolicyEpisodeAdapter
+from univis.adapters.base import (
+    EpisodeSource,
+    ImageFrame,
+    RawEpisodeAdapter,
+)
 from univis.adapters.hdf5 import HDF5EpisodeAdapter
 from univis.domain.policy_episode import Annotation, PolicyEpisode, PolicyEpisodeMetadata
 
@@ -69,9 +72,19 @@ class EpisodeSession:
             raise KeyError(f"unknown adapter: {adapter_name}")
         source = EpisodeSource(root_path=Path(root_path)) if root_path else None
         adapter = self.adapters[adapter_name]
-        adapter.list_metadata(source)
+        validation = adapter.validate_source(source)
+        if not validation.valid:
+            raise ValueError(validation.message)
         self.active = ActiveSource(adapter_name=adapter_name, source=source)
         return self.source_payload()
+
+    def validate_source(self, adapter_name: str, root_path: str | None = None) -> dict:
+        """Validate an adapter/source pair without changing active source."""
+
+        if adapter_name not in self.adapters:
+            raise KeyError(f"unknown adapter: {adapter_name}")
+        source = EpisodeSource(root_path=Path(root_path)) if root_path else None
+        return self.adapters[adapter_name].validate_source(source).model_dump()
 
     def source_payload(self) -> dict:
         """Return active source metadata.
@@ -98,6 +111,9 @@ class EpisodeSession:
         """
 
         adapter = self._active_adapter()
+        validation = adapter.validate_source(self.active.source)
+        if not validation.valid:
+            return []
         items: list[dict] = []
         for metadata in adapter.list_metadata(self.active.source):
             item = metadata.model_dump()
@@ -116,12 +132,42 @@ class EpisodeSession:
 
         return self._active_adapter().load_episode(episode_id, self.active.source)
 
+    def get_image_frame(
+        self,
+        episode_id: str,
+        camera_key: str,
+        frame_index: int,
+    ) -> ImageFrame:
+        """Read one encoded frame from the active adapter."""
+
+        return self._active_adapter().get_image_frame(
+            episode_id,
+            camera_key,
+            frame_index,
+            self.active.source,
+        )
+
+    def get_image_frames(
+        self,
+        episode_id: str,
+        camera_key: str,
+        start_index: int,
+        count: int,
+    ) -> list[ImageFrame]:
+        """Read a contiguous encoded frame batch from the active adapter."""
+
+        return self._active_adapter().get_image_frames(
+            episode_id,
+            camera_key,
+            start_index,
+            count,
+            self.active.source,
+        )
+
     def update_annotation(self, episode_id: str, annotation: Annotation) -> Annotation:
         """Persist annotation for the active source when supported."""
 
         adapter = self._active_adapter()
-        if isinstance(adapter, FakePolicyEpisodeAdapter):
-            return adapter.repository.update_annotation(episode_id, annotation)
         if isinstance(adapter, HDF5EpisodeAdapter):
             path = adapter.path_for_episode(episode_id, self.active.source)
             adapter.write_annotation(path, annotation)
@@ -140,8 +186,6 @@ class EpisodeSession:
     ) -> dict[str, object]:
         """Return UI conversion status for an episode."""
 
-        if isinstance(adapter, FakePolicyEpisodeAdapter):
-            return adapter.repository.conversion_state(metadata.episode_id)
         if isinstance(adapter, HDF5EpisodeAdapter):
             return {"status": "converted", "progress": 1.0}
         return {"status": "pending", "progress": 0.0}

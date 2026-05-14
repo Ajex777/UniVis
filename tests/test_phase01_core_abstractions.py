@@ -5,8 +5,7 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from univis.adapters.base import EpisodeSource
-from univis.adapters.fake_policy_episode import FakePolicyEpisodeAdapter
+from univis.adapters.base import EpisodeSource, RawEpisodeAdapter
 from univis.core.components import ComponentRegistry
 from univis.domain.policy_episode import (
     Annotation,
@@ -19,6 +18,26 @@ from univis.domain.policy_episode import (
 )
 from univis.exporters.mock import MockEpisodeExporter
 from univis.reachability.mock import MockReachabilityBackend
+
+
+class InlineEpisodeAdapter(RawEpisodeAdapter):
+    """Small concrete adapter used only for abstraction tests."""
+
+    @classmethod
+    def info(cls):
+        from univis.core.components import ComponentInfo
+
+        return ComponentInfo(
+            name="InlineEpisodeAdapter",
+            label="Inline Episode",
+            description="Test-only synchronized episode adapter.",
+        )
+
+    def list_metadata(self, source: EpisodeSource | None = None):
+        return [_metadata()]
+
+    def load_episode(self, episode_id: str, source: EpisodeSource | None = None):
+        return PolicyEpisode(metadata=_metadata(), frames=[_frame(0), _frame(1)])
 
 
 def _frame(index: int) -> PolicyFrame:
@@ -123,7 +142,7 @@ def test_mock_adapter_exporter_reachability_flow(tmp_path: Path) -> None:
         Assertions that mock implementations interoperate through interfaces.
     """
 
-    adapter = FakePolicyEpisodeAdapter()
+    adapter = InlineEpisodeAdapter()
     metadata = adapter.list_metadata(EpisodeSource())
     episode = adapter.load_episode(metadata[0].episode_id)
 
@@ -146,11 +165,11 @@ def test_component_registry_payload() -> None:
     """
 
     registry = ComponentRegistry(
-        input_adapters=[FakePolicyEpisodeAdapter()],
+        input_adapters=[InlineEpisodeAdapter()],
         output_exporters=[MockEpisodeExporter()],
         reachability_backends=[MockReachabilityBackend()],
     )
     payload = registry.api_payload()
-    assert payload["input_adapters"][0]["name"] == "FakePolicyEpisodeAdapter"
+    assert payload["input_adapters"][0]["name"] == "InlineEpisodeAdapter"
     assert payload["output_exporters"][0]["name"] == "MockEpisodeExporter"
     assert payload["reachability_backends"][0]["name"] == "MockReachabilityBackend"

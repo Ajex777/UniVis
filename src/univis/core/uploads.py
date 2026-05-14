@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime, timezone
+import json
 from pathlib import Path, PurePosixPath
 from uuid import uuid4
 
@@ -31,6 +33,7 @@ class UploadRecord:
     received_files: int = 0
     received_bytes: int = 0
     status: str = "created"
+    created_at: str = ""
 
     def payload(self) -> dict[str, object]:
         """Return a JSON-compatible upload summary."""
@@ -45,6 +48,7 @@ class UploadRecord:
             "received_files": self.received_files,
             "received_bytes": self.received_bytes,
             "status": self.status,
+            "created_at": self.created_at,
         }
 
 
@@ -63,6 +67,7 @@ class UploadManager:
         self.uploads_root = uploads_root
         self.uploads_root.mkdir(parents=True, exist_ok=True)
         self.records: dict[str, UploadRecord] = {}
+        self._load_records()
 
     def create(
         self,
@@ -83,8 +88,10 @@ class UploadManager:
             staging_root=staging_root,
             expected_files=expected_files,
             expected_bytes=expected_bytes,
+            created_at=datetime.now(timezone.utc).isoformat(),
         )
         self.records[upload_id] = record
+        self._save_record(record)
         return record
 
     def get(self, upload_id: str) -> UploadRecord:
@@ -102,6 +109,7 @@ class UploadManager:
         record.received_files += 1
         record.received_bytes += len(data)
         record.status = "uploading"
+        self._save_record(record)
         return target
 
     def complete(self, upload_id: str) -> UploadRecord:
@@ -109,6 +117,7 @@ class UploadManager:
 
         record = self.get(upload_id)
         record.status = "completed"
+        self._save_record(record)
         return record
 
     def scan_root(self, upload_id: str) -> Path:
@@ -120,6 +129,25 @@ class UploadManager:
         if not hdf5_files and len(children) == 1:
             return children[0]
         return root
+
+    def list_sources(self) -> list[dict[str, object]]:
+        """Return completed uploaded sources that still exist on disk."""
+
+        sources: list[dict[str, object]] = []
+        for record in sorted(
+            self.records.values(),
+            key=lambda item: item.created_at,
+            reverse=True,
+        ):
+            if record.status != "completed":
+                continue
+            scan_root = self.scan_root(record.upload_id)
+            if not scan_root.exists():
+                continue
+            payload = record.payload()
+            payload["scan_root"] = str(scan_root)
+            sources.append(payload)
+        return sources
 
     def _target_path(self, staging_root: Path, relative_path: str) -> Path:
         """Resolve a browser relative path safely under staging_root."""
@@ -134,3 +162,34 @@ class UploadManager:
         if root not in target.parents and target != root:
             raise ValueError(f"path escapes staging root: {relative_path}")
         return target
+
+    def _manifest_path(self, record: UploadRecord) -> Path:
+        return record.staging_root.parent / "manifest.json"
+
+    def _save_record(self, record: UploadRecord) -> None:
+        manifest = self._manifest_path(record)
+        manifest.parent.mkdir(parents=True, exist_ok=True)
+        manifest.write_text(
+            json.dumps(record.payload(), ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+
+    def _load_records(self) -> None:
+        for manifest in self.uploads_root.glob("*/manifest.json"):
+            try:
+                payload = json.loads(manifest.read_text(encoding="utf-8"))
+                record = UploadRecord(
+                    upload_id=str(payload["upload_id"]),
+                    input_adapter=str(payload["input_adapter"]),
+                    staging_root=Path(str(payload["staging_root"])),
+                    root_label=str(payload.get("root_label", "")),
+                    expected_files=int(payload.get("expected_files", 0)),
+                    expected_bytes=int(payload.get("expected_bytes", 0)),
+                    received_files=int(payload.get("received_files", 0)),
+                    received_bytes=int(payload.get("received_bytes", 0)),
+                    status=str(payload.get("status", "created")),
+                    created_at=str(payload.get("created_at", "")),
+                )
+                self.records[record.upload_id] = record
+            except Exception:
+                continue

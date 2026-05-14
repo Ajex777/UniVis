@@ -1,8 +1,8 @@
 """Core data models for synchronized PolicyEpisode visualization.
 
 The models in this file intentionally avoid dependencies on robot-specific
-packages. They describe the stable API contract shared by fake data, raw data
-adapters, HDF5 adapters, and future exporters.
+packages. They describe the stable API contract shared by raw data adapters,
+HDF5 adapters, and future exporters.
 """
 
 from __future__ import annotations
@@ -150,7 +150,7 @@ class PolicyEpisode(BaseModel):
         metadata: Lightweight episode metadata.
         frames: Synchronized dual-arm frames.
     Output:
-        Full fake PolicyEpisode payload for API-backed visualization.
+        Full PolicyEpisode payload for API-backed visualization.
     """
 
     metadata: PolicyEpisodeMetadata

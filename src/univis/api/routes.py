@@ -1,100 +1,60 @@
-"""FastAPI routes for Phase 00 fake PolicyEpisode visualization."""
+"""FastAPI routes for PolicyEpisode visualization."""
 
 from __future__ import annotations
 
+import base64
+
 from pydantic import BaseModel
-from fastapi import APIRouter, HTTPException, Response
+from fastapi import APIRouter, HTTPException, Query, Response
 
 from univis.core.components import ComponentRegistry
 from univis.core.episode_session import EpisodeSession
 from univis.domain.policy_episode import Annotation
-from univis.utils.color import color_for_key
-from univis.utils.image_svg import make_camera_svg
 
 
 class SourceSelectionRequest(BaseModel):
-    """Request payload for switching episode source.
-
-    Inputs:
-        input_adapter: Registered adapter component name.
-        root_path: Optional server-local file or directory path.
-    Output:
-        Validated source selection payload for route handlers.
-    """
+    """Request payload for switching or validating an episode source."""
 
     input_adapter: str
     root_path: str = ""
 
 
 class Phase00Router:
-    """Route container for fake PolicyEpisode APIs.
-
-    Inputs:
-        repository: Fake in-memory PolicyEpisode repository.
-    Output:
-        A configured FastAPI router mounted by the application factory.
-    """
+    """Route container for PolicyEpisode APIs."""
 
     def __init__(
         self,
         session: EpisodeSession,
         registry: ComponentRegistry,
     ) -> None:
-        """Initialize the router and register endpoints.
-
-        Inputs:
-            session: Current episode source context.
-            registry: Component registry for adapter/exporter/backend metadata.
-        Output:
-            Router instance accessible through `self.router`.
-        """
-
+        """Initialize the router with session and component registry."""
         self.session = session
         self.registry = registry
         self.router = APIRouter(prefix="/api")
         self._register()
 
     def _register(self) -> None:
-        """Register API routes.
-
-        Inputs:
-            None.
-        Output:
-            Mutates `self.router` by adding endpoints.
-        """
-
+        """Register API routes."""
         self.router.add_api_route("/episodes", self.list_episodes, methods=["GET"])
         self.router.add_api_route("/registry", self.get_registry, methods=["GET"])
+        self.router.add_api_route("/source/validate", self.validate_source, methods=["POST"])
         self.router.add_api_route("/source", self.set_source, methods=["POST"])
-        self.router.add_api_route(
-            "/episodes/{episode_id}/metadata",
-            self.get_metadata,
-            methods=["GET"],
-        )
-        self.router.add_api_route(
-            "/episodes/{episode_id}/trajectory",
-            self.get_trajectory,
-            methods=["GET"],
-        )
-        self.router.add_api_route(
-            "/episodes/{episode_id}/annotation",
-            self.update_annotation,
-            methods=["PATCH"],
-        )
+        self.router.add_api_route("/episodes/{episode_id}/metadata", self.get_metadata, methods=["GET"])
+        self.router.add_api_route("/episodes/{episode_id}/trajectory", self.get_trajectory, methods=["GET"])
+        self.router.add_api_route("/episodes/{episode_id}/annotation", self.update_annotation, methods=["PATCH"])
         self.router.add_api_route(
             "/episodes/{episode_id}/frame/{camera_key}/{frame_index}",
             self.get_camera_frame,
             methods=["GET"],
         )
+        self.router.add_api_route(
+            "/episodes/{episode_id}/frames/{camera_key}",
+            self.get_camera_frames,
+            methods=["GET"],
+        )
 
     def list_episodes(self) -> list[dict]:
-        """Return fake episode list for the sidebar.
-
-        Inputs:
-            None.
-        Output:
-            List of metadata summaries as JSON-compatible dicts.
-        """
+        """Return episode list for the sidebar."""
 
         items: list[dict] = []
         try:
@@ -104,26 +64,12 @@ class Phase00Router:
         return items
 
     def get_registry(self) -> dict:
-        """Return registered fake adapter/exporter choices.
-
-        Inputs:
-            None.
-        Output:
-            Registry-like payload for UI dropdowns. Names mirror the future
-            class registration model without importing real adapters yet.
-        """
+        """Return registered adapter/exporter/backend choices."""
 
         return self.registry.api_payload()
 
     def set_source(self, request: SourceSelectionRequest) -> dict:
-        """Switch the active episode source.
-
-        Inputs:
-            request: Adapter name and optional server-local root path.
-        Output:
-            Active source summary and fresh episode list.
-        """
-
+        """Switch the active episode source."""
         root_path = request.root_path.strip() or None
         try:
             source = self.session.set_source(request.input_adapter, root_path)
@@ -132,15 +78,17 @@ class Phase00Router:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
         return {"source": source, "episodes": episodes}
 
+    def validate_source(self, request: SourceSelectionRequest) -> dict:
+        """Validate an input adapter and root path without switching source."""
+
+        root_path = request.root_path.strip() or None
+        try:
+            return self.session.validate_source(request.input_adapter, root_path)
+        except Exception as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
     def get_metadata(self, episode_id: str) -> dict:
-        """Return metadata for a selected episode.
-
-        Inputs:
-            episode_id: Stable fake episode id.
-        Output:
-            Metadata dict for viewer setup.
-        """
-
+        """Return metadata for a selected episode."""
         try:
             return self.session.get_metadata(episode_id).model_dump()
         except KeyError as exc:
@@ -149,15 +97,7 @@ class Phase00Router:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     def get_trajectory(self, episode_id: str) -> dict:
-        """Return synchronized trajectory arrays for visualization.
-
-        Inputs:
-            episode_id: Stable fake episode id.
-        Output:
-            JSON dict containing frame indices, timestamps, left/right xyz,
-            gripper values, and reachability overlay.
-        """
-
+        """Return synchronized trajectory arrays for visualization."""
         try:
             episode = self.session.get_episode(episode_id)
         except KeyError as exc:
@@ -180,15 +120,7 @@ class Phase00Router:
         }
 
     def update_annotation(self, episode_id: str, annotation: Annotation) -> dict:
-        """Persist in-memory annotation changes.
-
-        Inputs:
-            episode_id: Stable fake episode id.
-            annotation: Replacement annotation payload.
-        Output:
-            Saved annotation dict.
-        """
-
+        """Persist annotation changes through the active adapter."""
         try:
             saved = self.session.update_annotation(episode_id, annotation)
         except KeyError as exc:
@@ -203,15 +135,7 @@ class Phase00Router:
         camera_key: str,
         frame_index: int,
     ) -> Response:
-        """Return one generated camera frame as SVG.
-
-        Inputs:
-            episode_id: Stable fake episode id.
-            camera_key: Camera stream key.
-            frame_index: Synchronized frame index.
-        Output:
-            SVG image response.
-        """
+        """Return one real adapter frame."""
 
         try:
             meta = self.session.get_metadata(episode_id)
@@ -225,12 +149,51 @@ class Phase00Router:
             raise HTTPException(status_code=404, detail="camera not found")
 
         idx = max(0, min(int(frame_index), meta.num_frames - 1))
-        svg = make_camera_svg(
-            camera_key=camera_key,
-            frame_index=idx,
-            width=camera.width,
-            height=camera.height,
-            color=color_for_key(camera_key, idx),
-            total_frames=meta.num_frames,
-        )
-        return Response(content=svg, media_type="image/svg+xml")
+        try:
+            image = self.session.get_image_frame(episode_id, camera_key, idx)
+        except Exception as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        return Response(content=image.data, media_type=image.media_type)
+
+    def get_camera_frames(
+        self,
+        episode_id: str,
+        camera_key: str,
+        start: int = Query(default=0, ge=0),
+        count: int = Query(default=50, ge=1, le=100),
+    ) -> dict:
+        """Return a contiguous base64 PNG batch for playback prefetch."""
+
+        try:
+            meta = self.session.get_metadata(episode_id)
+        except KeyError as exc:
+            raise HTTPException(status_code=404, detail="episode not found") from exc
+        except Exception as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+        camera = next((cam for cam in meta.cameras if cam.key == camera_key), None)
+        if camera is None:
+            raise HTTPException(status_code=404, detail="camera not found")
+
+        start_idx = max(0, min(int(start), meta.num_frames - 1))
+        batch_count = min(int(count), meta.num_frames - start_idx)
+        try:
+            images = self.session.get_image_frames(
+                episode_id, camera_key, start_idx, batch_count
+            )
+        except Exception as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        return {
+            "episode_id": episode_id,
+            "camera_key": camera_key,
+            "start": start_idx,
+            "count": len(images),
+            "frames": [
+                {
+                    "index": start_idx + offset,
+                    "media_type": image.media_type,
+                    "data": base64.b64encode(image.data).decode("ascii"),
+                }
+                for offset, image in enumerate(images)
+            ],
+        }

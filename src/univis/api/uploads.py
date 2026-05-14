@@ -49,6 +49,12 @@ class UploadRouter:
         """Register upload endpoints."""
 
         self.router.add_api_route("/datasets", self.create_dataset, methods=["POST"])
+        self.router.add_api_route("/sources", self.list_sources, methods=["GET"])
+        self.router.add_api_route(
+            "/sources/{upload_id}/activate",
+            self.activate_source,
+            methods=["POST"],
+        )
         self.router.add_api_route("/{upload_id}", self.get_upload, methods=["GET"])
         self.router.add_api_route("/{upload_id}/files", self.upload_files, methods=["POST"])
         self.router.add_api_route(
@@ -71,6 +77,11 @@ class UploadRouter:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
         return record.payload()
 
+    def list_sources(self) -> list[dict]:
+        """Return completed upload-backed sources available after refresh."""
+
+        return self.manager.list_sources()
+
     def get_upload(self, upload_id: str) -> dict:
         """Return upload status."""
 
@@ -78,6 +89,26 @@ class UploadRouter:
             return self.manager.get(upload_id).payload()
         except KeyError as exc:
             raise HTTPException(status_code=404, detail="upload not found") from exc
+
+    def activate_source(self, upload_id: str) -> dict:
+        """Switch active viewer source to a completed uploaded dataset."""
+
+        try:
+            record = self.manager.get(upload_id)
+            if record.status != "completed":
+                raise ValueError("upload is not completed")
+            scan_root = self.manager.scan_root(upload_id)
+            source = self.session.set_source(record.input_adapter, str(scan_root))
+            episodes = self.session.list_episodes()
+        except KeyError as exc:
+            raise HTTPException(status_code=404, detail="upload not found") from exc
+        except Exception as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        return {
+            "upload": record.payload(),
+            "source": source,
+            "episodes": episodes,
+        }
 
     async def upload_files(
         self,
@@ -105,6 +136,12 @@ class UploadRouter:
         try:
             record = self.manager.complete(upload_id)
             scan_root = self.manager.scan_root(upload_id)
+            validation = self.session.validate_source(
+                record.input_adapter,
+                str(scan_root),
+            )
+            if not validation["valid"]:
+                raise ValueError(validation["message"])
             source = self.session.set_source(record.input_adapter, str(scan_root))
             episodes = self.session.list_episodes()
         except KeyError as exc:

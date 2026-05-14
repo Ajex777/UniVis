@@ -2,14 +2,11 @@
   const h = React.createElement;
   const { useEffect, useMemo, useState } = React;
   const { fetchJson } = window.UniVisApi;
+  const SourceIO = window.UniVisSourceIO;
+  const { useFrameCache } = window.UniVisFrameCache;
   const { CameraCard, EpisodeButton, SourceControls, defaultSlots } = window.UniVisComponents;
   const { GripperChart, useTrajectoryPlot } = window.UniVisPlots;
 
-/**
- * Main UniVis React component.
- * Input: None.
- * Output: Phase 001 web viewer bound to fake PolicyEpisode API data.
- */
 function App() {
   const [episodes, setEpisodes] = useState([]);
   const [registry, setRegistry] = useState(null);
@@ -22,18 +19,37 @@ function App() {
   const [message, setMessage] = useState("");
   const [collapsed, setCollapsed] = useState(false);
   const [playSpeed, setPlaySpeed] = useState(0);
-  const [inputFormat, setInputFormat] = useState("FakePolicyEpisodeAdapter");
+  const [inputFormat, setInputFormat] = useState("HDF5EpisodeAdapter");
   const [outputFormat, setOutputFormat] = useState("HDF5EpisodeExporter");
   const [directoryLabel, setDirectoryLabel] = useState("");
   const [directoryFiles, setDirectoryFiles] = useState([]);
+  const [sourceMessage, setSourceMessage] = useState("");
+  const [uploadSources, setUploadSources] = useState([]);
+  const [selectedUploadId, setSelectedUploadId] = useState("");
   useTrajectoryPlot("trajectory-plot", trajectory, frameIndex);
+  const cameraKeys = useMemo(() => {
+    return Array.from(new Set([slots.main, slots.left, slots.right].filter(Boolean)));
+  }, [slots.main, slots.left, slots.right]);
+  const frameUrls = useFrameCache(
+    episodeId,
+    cameraKeys,
+    frameIndex,
+    metadata?.num_frames || 0,
+  );
 
   useEffect(() => {
-    Promise.all([fetchJson("/api/episodes"), fetchJson("/api/registry")])
-      .then(([items, reg]) => {
+    Promise.all([
+      fetchJson("/api/episodes"),
+      fetchJson("/api/registry"),
+      SourceIO.listUploadedSources(),
+    ])
+      .then(([items, reg, sources]) => {
         setEpisodes(items);
         setRegistry(reg);
+        setUploadSources(sources);
+        setSelectedUploadId(sources[0]?.upload_id || "");
         if (items.length) setEpisodeId(items[0].episode_id);
+        setInputFormat(reg.input_adapters[0]?.name || "HDF5EpisodeAdapter");
       }).catch((error) => setMessage(error.message));
   }, []);
 
@@ -80,72 +96,107 @@ function App() {
 
   const uploadSource = async () => {
     try {
-      if (!directoryFiles.length) {
-        setMessage("Choose a local directory first");
-        return;
-      }
-      const totalSize = directoryFiles.reduce((sum, file) => sum + file.size, 0);
-      const first = directoryFiles[0]?.webkitRelativePath || directoryFiles[0]?.name || "";
-      const root = first.includes("/") ? first.split("/")[0] : "selected directory";
       setMessage(`Uploading ${directoryFiles.length} file(s)...`);
-      const upload = await fetchJson("/api/uploads/datasets", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          input_adapter: inputFormat,
-          root_label: root,
-          file_count: directoryFiles.length,
-          total_size: totalSize,
-        }),
-      });
-      const formData = new FormData();
-      directoryFiles.forEach((file) => {
-        formData.append("files", file, file.name);
-        formData.append("relative_paths", file.webkitRelativePath || file.name);
-      });
-      await fetchJson(`/api/uploads/${upload.upload_id}/files`, {
-        method: "POST",
-        body: formData,
-      });
-      const payload = await fetchJson(`/api/uploads/${upload.upload_id}/complete`, {
-        method: "POST",
-      });
-      const items = payload.episodes || [];
-      setEpisodes(items);
-      setEpisodeId(items[0]?.episode_id || "");
-      setMessage(`Loaded ${items.length} episode(s)`);
+      await applySourcePayload(await SourceIO.uploadSource(inputFormat, directoryFiles));
+      const sources = await SourceIO.listUploadedSources();
+      setUploadSources(sources);
+      setSelectedUploadId(sources[0]?.upload_id || "");
     } catch (error) {
+      setSourceMessage(error.message);
       setMessage(error.message);
     }
   };
 
-  const onDirectoryChange = (event) => {
-    const files = Array.from(event.target.files || []);
-    const first = files[0]?.webkitRelativePath || files[0]?.name || "";
-    const root = first.includes("/") ? first.split("/")[0] : "selected directory";
-    setDirectoryFiles(files);
-    setDirectoryLabel(files.length ? `${root} · ${files.length} files selected` : "");
+  const pickDirectory = async () => {
+    try {
+      applySelection(await SourceIO.pickDirectory(inputFormat));
+    } catch (error) {
+      if (error.name !== "AbortError") {
+        setSourceMessage(error.message);
+        setMessage(error.message);
+      }
+    }
   };
+
+  const pickFile = async () => {
+    try {
+      applySelection(await SourceIO.pickHdf5File(inputFormat));
+    } catch (error) {
+      setSourceMessage(error.message);
+      setMessage(error.message);
+    }
+  };
+
+  const activateUploadedSource = async () => {
+    if (!selectedUploadId) return;
+    try {
+      await applySourcePayload(await SourceIO.activateUploadedSource(selectedUploadId));
+    } catch (error) {
+      setSourceMessage(error.message);
+      setMessage(error.message);
+    }
+  };
+
+  const applySelection = (selection) => {
+    setDirectoryFiles(selection.entries);
+    setDirectoryLabel(selection.label);
+    setSourceMessage(selection.error || "");
+    setMessage(selection.error || "");
+  };
+
+  const applySourcePayload = async (payload) => {
+    const items = payload.episodes || [];
+    setEpisodes(items);
+    setEpisodeId(items[0]?.episode_id || "");
+    setSourceMessage("");
+    setMessage(`Loaded ${items.length} episode(s)`);
+  };
+
+  const sourceControls = h(SourceControls, {
+    registry,
+    inputFormat,
+    outputFormat,
+    directoryLabel,
+    sourceMessage,
+    uploadSources,
+    selectedUploadId,
+    onPickDirectory: pickDirectory,
+    onPickFile: pickFile,
+    onSelectedUploadId: setSelectedUploadId,
+    onActivateUploadSource: activateUploadedSource,
+    onInputFormat: setInputFormat,
+    onOutputFormat: setOutputFormat,
+    onUploadSource: uploadSource,
+  });
 
   if (!metadata || !annotation) {
     return h("div", { className: "app" },
-      h("div", { className: "brand" }, h("h1", null, "UniVis"), h("p", null, "Loading...")),
+      h("aside", { className: "sidebar" },
+        h("div", { className: "brand" }, h("h1", null, "UniVis"), h("p", null, "PolicyEpisode viewer")),
+        sourceControls,
+        h("div", { className: "list-header" }, h("strong", null, "Episodes")),
+        h("div", { className: "episode-list" }, episodes.map((item) =>
+          h(EpisodeButton, {
+            key: item.episode_id,
+            item,
+            active: item.episode_id === episodeId,
+            onClick: () => setEpisodeId(item.episode_id),
+          }),
+        )),
+      ),
+      h("main", { className: "stage empty-stage" },
+        h("section", { className: "panel" },
+          h("strong", null, "Choose a HDF5 source"),
+          h("p", { className: "meta" }, message || "Select a top-level directory containing .hdf5 or .h5 files."),
+        ),
+      ),
     );
   }
 
   return h("div", { className: "app" },
     h("aside", { className: "sidebar" },
       h("div", { className: "brand" }, h("h1", null, "UniVis"), h("p", null, "PolicyEpisode viewer")),
-      h(SourceControls, {
-        registry,
-        inputFormat,
-        outputFormat,
-        directoryLabel,
-        onDirectoryChange,
-        onInputFormat: setInputFormat,
-        onOutputFormat: setOutputFormat,
-        onUploadSource: uploadSource,
-      }),
+      sourceControls,
       h("div", { className: "list-header" },
         h("strong", null, "Episodes"),
         h("button", { className: "link-button", onClick: () => setCollapsed(!collapsed) }, collapsed ? "Expand" : "Collapse"),
@@ -162,10 +213,10 @@ function App() {
     h("main", { className: "stage" },
       h("section", { className: "viewer-grid" },
         h("div", { className: "panel camera-panel" },
-          h(CameraCard, { title: "Main", cameras: metadata.cameras, cameraKey: slots.main, onChange: (value) => setSlots({ ...slots, main: value }), episodeId, frameIndex }),
+          h(CameraCard, { title: "Main", cameras: metadata.cameras, cameraKey: slots.main, onChange: (value) => setSlots({ ...slots, main: value }), frameIndex, imageUrl: frameUrls[slots.main] }),
           h("div", { className: "wrist-row" },
-            h(CameraCard, { title: "Left", cameras: metadata.cameras, cameraKey: slots.left, onChange: (value) => setSlots({ ...slots, left: value }), episodeId, frameIndex }),
-            h(CameraCard, { title: "Right", cameras: metadata.cameras, cameraKey: slots.right, onChange: (value) => setSlots({ ...slots, right: value }), episodeId, frameIndex }),
+            h(CameraCard, { title: "Left", cameras: metadata.cameras, cameraKey: slots.left, onChange: (value) => setSlots({ ...slots, left: value }), frameIndex, imageUrl: frameUrls[slots.left] }),
+            h(CameraCard, { title: "Right", cameras: metadata.cameras, cameraKey: slots.right, onChange: (value) => setSlots({ ...slots, right: value }), frameIndex, imageUrl: frameUrls[slots.right] }),
           ),
         ),
         h("div", { className: "panel" }, h("div", { id: "trajectory-plot", className: "plot" })),

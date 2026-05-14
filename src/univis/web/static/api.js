@@ -19,14 +19,9 @@
     return response.json();
   }
 
-  /**
-   * Return the image URL for a generated camera frame.
-   * Input: episode id, camera key, and frame index.
-   * Output: API URL string for an SVG image.
-   */
-  function frameUrl(episodeId, cameraKey, frameIndex) {
-    return `/api/episodes/${episodeId}/frame/${cameraKey}/${frameIndex}`;
+  function frameBatchUrl(episodeId, cameraKey, start, count) {
+    return `/api/episodes/${episodeId}/frames/${cameraKey}?start=${start}&count=${count}`;
   }
 
-  window.UniVisApi = { fetchJson, frameUrl };
+  window.UniVisApi = { fetchJson, frameBatchUrl };
 })();
