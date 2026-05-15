@@ -20,7 +20,7 @@
    * Input: slot metadata, selected camera, and current frame.
    * Output: React element containing a selector and generated image.
    */
-  function CameraCard({ title, cameras, cameraKey, onChange, frameIndex, imageUrl }) {
+  function CameraCard({ title, cameras, cameraKey, onChange, episodeId, frameIndex }) {
     return h("div", { className: "camera-card" },
       h("div", { className: "camera-title" },
         h("span", null, title),
@@ -31,10 +31,10 @@
           h("option", { key: camera.key, value: camera.key }, camera.label),
         )),
       ),
-      cameraKey && imageUrl ? h("img", {
+      cameraKey ? h("img", {
         alt: `${cameraKey} frame ${frameIndex}`,
-        src: imageUrl,
-      }) : h("div", { className: "camera-placeholder" }),
+        src: window.UniVisApi.frameUrl(episodeId, cameraKey, frameIndex),
+      }) : null,
     );
   }
 

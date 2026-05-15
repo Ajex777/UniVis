@@ -29,7 +29,7 @@
 
 当前 Phase 02c 实现以 `pika_raw_to_compressed_hdf5.py` 生成结构为准：`observations/images` 下包含 `<camera>_index`、`<camera>_start` 和 `<camera>/<chunk_id>`，chunk 内图像为 BHW/BHWC。Web `/frame` API 按需读取单帧并返回 PNG。`h5ffmpeg` 已加入 uv runtime dependencies，`uv sync` 后可解码真实 ffmpeg-compressed HDF5。
 
-播放路径优先使用 batch image API：`/api/episodes/{episode_id}/frames/{camera_key}?start=<n>&count=50`。前端按 50 帧窗口缓存 object URL，并预取下一窗口；旧 `/frame` 单帧接口保留作调试和兼容入口，不再由主 viewer 逐帧调用。
+当前主 viewer 播放路径使用稳定的单帧 `/frame` image request。50 帧 batch image API 和前端预取缓存先作为未来优化点保留设计方向；再次启用前需要验证全 episode 缓存淘汰、后半段窗口加载、拖动 seek 和多 camera 同步。
 
 ## Upload-Based Source Flow
 

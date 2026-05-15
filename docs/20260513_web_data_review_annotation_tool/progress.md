@@ -33,5 +33,5 @@
 - Added `h5ffmpeg` to the uv-managed runtime dependencies and smoke-tested real PIKA HDF5 image serving against `/Users/admin/CS_Engineering/Repositories/Development/dataset/sort_book_0509_right_only/pos1`.
 - Added persistent upload manifests plus `/api/uploads/sources` and source activation APIs, so completed browser uploads can be listed and reloaded after page refresh or server restart instead of being uploaded again.
 - Added frontend controls for choosing either a top-level HDF5 directory or a single HDF5 file, plus a visible source validation error panel.
-- Added batched image prefetch for playback: `/api/episodes/{episode_id}/frames/{camera_key}` returns contiguous PNG batches, and the frontend caches 50-frame windows with next-window prefetch instead of requesting `/frame` on every displayed frame.
+- Reverted the main viewer playback path to stable single-frame image requests after the first batched prefetch pass showed incomplete later-episode loading. Batched image prefetch is now tracked as a future optimization rather than the default playback path.
 - Phase 02 remaining work: decide how `PolicyEpisode` should carry or reference image payloads before implementing real image export from `HDF5EpisodeExporter`.

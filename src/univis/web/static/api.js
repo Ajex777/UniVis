@@ -19,9 +19,9 @@
     return response.json();
   }
 
-  function frameBatchUrl(episodeId, cameraKey, start, count) {
-    return `/api/episodes/${episodeId}/frames/${cameraKey}?start=${start}&count=${count}`;
+  function frameUrl(episodeId, cameraKey, frameIndex) {
+    return `/api/episodes/${episodeId}/frame/${cameraKey}/${frameIndex}`;
   }
 
-  window.UniVisApi = { fetchJson, frameBatchUrl };
+  window.UniVisApi = { fetchJson, frameUrl };
 })();

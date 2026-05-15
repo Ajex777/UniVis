@@ -3,7 +3,6 @@
   const { useEffect, useMemo, useState } = React;
   const { fetchJson } = window.UniVisApi;
   const SourceIO = window.UniVisSourceIO;
-  const { useFrameCache } = window.UniVisFrameCache;
   const { CameraCard, EpisodeButton, SourceControls, defaultSlots } = window.UniVisComponents;
   const { GripperChart, useTrajectoryPlot } = window.UniVisPlots;
 
@@ -27,15 +26,6 @@ function App() {
   const [uploadSources, setUploadSources] = useState([]);
   const [selectedUploadId, setSelectedUploadId] = useState("");
   useTrajectoryPlot("trajectory-plot", trajectory, frameIndex);
-  const cameraKeys = useMemo(() => {
-    return Array.from(new Set([slots.main, slots.left, slots.right].filter(Boolean)));
-  }, [slots.main, slots.left, slots.right]);
-  const frameUrls = useFrameCache(
-    episodeId,
-    cameraKeys,
-    frameIndex,
-    metadata?.num_frames || 0,
-  );
 
   useEffect(() => {
     Promise.all([
@@ -213,10 +203,10 @@ function App() {
     h("main", { className: "stage" },
       h("section", { className: "viewer-grid" },
         h("div", { className: "panel camera-panel" },
-          h(CameraCard, { title: "Main", cameras: metadata.cameras, cameraKey: slots.main, onChange: (value) => setSlots({ ...slots, main: value }), frameIndex, imageUrl: frameUrls[slots.main] }),
+          h(CameraCard, { title: "Main", cameras: metadata.cameras, cameraKey: slots.main, onChange: (value) => setSlots({ ...slots, main: value }), episodeId, frameIndex }),
           h("div", { className: "wrist-row" },
-            h(CameraCard, { title: "Left", cameras: metadata.cameras, cameraKey: slots.left, onChange: (value) => setSlots({ ...slots, left: value }), frameIndex, imageUrl: frameUrls[slots.left] }),
-            h(CameraCard, { title: "Right", cameras: metadata.cameras, cameraKey: slots.right, onChange: (value) => setSlots({ ...slots, right: value }), frameIndex, imageUrl: frameUrls[slots.right] }),
+            h(CameraCard, { title: "Left", cameras: metadata.cameras, cameraKey: slots.left, onChange: (value) => setSlots({ ...slots, left: value }), episodeId, frameIndex }),
+            h(CameraCard, { title: "Right", cameras: metadata.cameras, cameraKey: slots.right, onChange: (value) => setSlots({ ...slots, right: value }), episodeId, frameIndex }),
           ),
         ),
         h("div", { className: "panel" }, h("div", { id: "trajectory-plot", className: "plot" })),
