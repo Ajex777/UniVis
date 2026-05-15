@@ -25,6 +25,8 @@ function App() {
   const [sourceMessage, setSourceMessage] = useState("");
   const [uploadSources, setUploadSources] = useState([]);
   const [selectedUploadId, setSelectedUploadId] = useState("");
+  const [sourceMode, setSourceMode] = useState("Mode: no source selected");
+  const [sourceRevision, setSourceRevision] = useState(0);
   useTrajectoryPlot("trajectory-plot", trajectory, frameIndex);
 
   useEffect(() => {
@@ -58,7 +60,7 @@ function App() {
       setSlots(defaultSlots(meta.cameras));
       setFrameIndex(0);
     }).catch((error) => setMessage(error.message));
-  }, [episodeId]);
+  }, [episodeId, sourceRevision]);
 
   useEffect(() => {
     if (!metadata || playSpeed <= 0) return undefined;
@@ -87,7 +89,7 @@ function App() {
   const uploadSource = async () => {
     try {
       setMessage(`Uploading ${directoryFiles.length} file(s)...`);
-      await applySourcePayload(await SourceIO.uploadSource(inputFormat, directoryFiles));
+      await applySourcePayload(await SourceIO.uploadSource(inputFormat, directoryFiles), "Mode: upload fallback");
       const sources = await SourceIO.listUploadedSources();
       setUploadSources(sources);
       setSelectedUploadId(sources[0]?.upload_id || "");
@@ -120,7 +122,7 @@ function App() {
   const activateUploadedSource = async () => {
     if (!selectedUploadId) return;
     try {
-      await applySourcePayload(await SourceIO.activateUploadedSource(selectedUploadId));
+      await applySourcePayload(await SourceIO.activateUploadedSource(selectedUploadId), "Mode: uploaded source");
     } catch (error) {
       setSourceMessage(error.message);
       setMessage(error.message);
@@ -134,11 +136,13 @@ function App() {
     setMessage(selection.error || "");
   };
 
-  const applySourcePayload = async (payload) => {
+  const applySourcePayload = async (payload, modeText) => {
     const items = payload.episodes || [];
     setEpisodes(items);
     setEpisodeId(items[0]?.episode_id || "");
     setSourceMessage("");
+    setSourceMode(modeText || payload.mode || "Mode: source selected");
+    setSourceRevision((value) => value + 1);
     setMessage(`Loaded ${items.length} episode(s)`);
   };
 
@@ -150,6 +154,8 @@ function App() {
     sourceMessage,
     uploadSources,
     selectedUploadId,
+    sourceMode,
+    onApplySourcePayload: applySourcePayload,
     onPickDirectory: pickDirectory,
     onPickFile: pickFile,
     onSelectedUploadId: setSelectedUploadId,
@@ -176,8 +182,8 @@ function App() {
       ),
       h("main", { className: "stage empty-stage" },
         h("section", { className: "panel" },
-          h("strong", null, "Choose a HDF5 source"),
-          h("p", { className: "meta" }, message || "Select a top-level directory containing .hdf5 or .h5 files."),
+          h("strong", null, "Choose a data source"),
+          h("p", { className: "meta" }, message || "Select a workspace path or use upload fallback."),
         ),
       ),
     );
@@ -203,10 +209,10 @@ function App() {
     h("main", { className: "stage" },
       h("section", { className: "viewer-grid" },
         h("div", { className: "panel camera-panel" },
-          h(CameraCard, { title: "Main", cameras: metadata.cameras, cameraKey: slots.main, onChange: (value) => setSlots({ ...slots, main: value }), episodeId, frameIndex }),
+          h(CameraCard, { title: "Main", cameras: metadata.cameras, cameraKey: slots.main, onChange: (value) => setSlots({ ...slots, main: value }), episodeId, frameIndex, sourceRevision }),
           h("div", { className: "wrist-row" },
-            h(CameraCard, { title: "Left", cameras: metadata.cameras, cameraKey: slots.left, onChange: (value) => setSlots({ ...slots, left: value }), episodeId, frameIndex }),
-            h(CameraCard, { title: "Right", cameras: metadata.cameras, cameraKey: slots.right, onChange: (value) => setSlots({ ...slots, right: value }), episodeId, frameIndex }),
+            h(CameraCard, { title: "Left", cameras: metadata.cameras, cameraKey: slots.left, onChange: (value) => setSlots({ ...slots, left: value }), episodeId, frameIndex, sourceRevision }),
+            h(CameraCard, { title: "Right", cameras: metadata.cameras, cameraKey: slots.right, onChange: (value) => setSlots({ ...slots, right: value }), episodeId, frameIndex, sourceRevision }),
           ),
         ),
         h("div", { className: "panel" }, h("div", { id: "trajectory-plot", className: "plot" })),

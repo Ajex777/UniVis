@@ -126,6 +126,18 @@ class HDF5EpisodeAdapter(RawEpisodeAdapter):
                 separators=(",", ":"),
             )
 
+    def update_annotation(
+        self,
+        episode_id: str,
+        annotation: Annotation,
+        source: EpisodeSource | None = None,
+    ) -> Annotation:
+        """Persist annotation updates for one HDF5 episode."""
+
+        path = self.path_for_episode(episode_id, source)
+        self.write_annotation(path, annotation)
+        return self.load_episode(episode_id, source).metadata.annotation
+
     def write_language_prompt(self, hdf5_path: Path, language_prompt: str) -> None:
         """Write back the HDF5 `language_prompt` dataset."""
         from univis.utils.hdf5_episode import write_string_dataset

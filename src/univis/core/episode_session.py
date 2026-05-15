@@ -57,6 +57,8 @@ class EpisodeSession:
         if default_adapter_name not in self.adapters:
             raise KeyError(f"unknown default adapter: {default_adapter_name}")
         self.active = ActiveSource(adapter_name=default_adapter_name)
+        self._episode_cache: dict[str, PolicyEpisode] = {}
+        self._metadata_cache: dict[str, PolicyEpisodeMetadata] = {}
 
     def set_source(self, adapter_name: str, root_path: str | None = None) -> dict:
         """Switch the active episode source.
@@ -76,6 +78,8 @@ class EpisodeSession:
         if not validation.valid:
             raise ValueError(validation.message)
         self.active = ActiveSource(adapter_name=adapter_name, source=source)
+        self._episode_cache.clear()
+        self._metadata_cache.clear()
         return self.source_payload()
 
     def validate_source(self, adapter_name: str, root_path: str | None = None) -> dict:
@@ -123,14 +127,23 @@ class EpisodeSession:
         return items
 
     def get_metadata(self, episode_id: str) -> PolicyEpisodeMetadata:
-        """Return metadata for one active episode."""
+        """Return metadata for one active episode (cached)."""
 
-        return self.get_episode(episode_id).metadata
+        if episode_id in self._metadata_cache:
+            return self._metadata_cache[episode_id]
+        episode = self.get_episode(episode_id)
+        self._metadata_cache[episode_id] = episode.metadata
+        return episode.metadata
 
     def get_episode(self, episode_id: str) -> PolicyEpisode:
-        """Load one active episode."""
+        """Load one active episode (cached)."""
 
-        return self._active_adapter().load_episode(episode_id, self.active.source)
+        if episode_id in self._episode_cache:
+            return self._episode_cache[episode_id]
+        episode = self._active_adapter().load_episode(episode_id, self.active.source)
+        self._episode_cache[episode_id] = episode
+        self._metadata_cache[episode_id] = episode.metadata
+        return episode
 
     def get_image_frame(
         self,
@@ -168,11 +181,10 @@ class EpisodeSession:
         """Persist annotation for the active source when supported."""
 
         adapter = self._active_adapter()
-        if isinstance(adapter, HDF5EpisodeAdapter):
-            path = adapter.path_for_episode(episode_id, self.active.source)
-            adapter.write_annotation(path, annotation)
-            return adapter.load_episode(episode_id, self.active.source).metadata.annotation
-        raise NotImplementedError(f"annotation update is not supported by {adapter.info().name}")
+        result = adapter.update_annotation(episode_id, annotation, self.active.source)
+        self._episode_cache.pop(episode_id, None)
+        self._metadata_cache.pop(episode_id, None)
+        return result
 
     def _active_adapter(self) -> RawEpisodeAdapter:
         """Return the current adapter instance."""

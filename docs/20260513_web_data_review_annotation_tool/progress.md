@@ -35,3 +35,19 @@
 - Added frontend controls for choosing either a top-level HDF5 directory or a single HDF5 file, plus a visible source validation error panel.
 - Reverted the main viewer playback path to stable single-frame image requests after the first batched prefetch pass showed incomplete later-episode loading. Batched image prefetch is now tracked as a future optimization rather than the default playback path.
 - Phase 02 remaining work: decide how `PolicyEpisode` should carry or reference image payloads before implementing real image export from `HDF5EpisodeExporter`.
+
+## 2026-05-15
+- Started Phase 03 PIKA raw adapter implementation. Current target is a minimal but testable adapter path: scan PIKA raw episode directories, synchronize the same qpos frame rows as `pika_raw_to_compressed_hdf5.py`, expose camera frames through adapter frame APIs, and write annotation updates back to `instructions.json`.
+- Implemented Phase 03 first pass: `PikaRawEpisodeAdapter`, PIKA manifest scanning, converter-compatible synchronization, standalone SE(3) helpers, raw image frame serving, and `instructions.json` annotation writeback.
+- Registered `PikaRawEpisodeAdapter` in the runtime component registry and generalized annotation writeback through the base adapter interface instead of hard-coding HDF5 in `EpisodeSession`.
+- Updated frontend source selection so non-HDF5 adapters can recursively upload browser-selected directories, while HDF5 remains top-level-only for safety.
+- Added PIKA raw fixtures and tests for adapter loading, frame serving, instruction writeback, and upload activation.
+- Verified with `pytest` (`19 passed`), `compileall`, `node --check`, file line-count scan, and a real `/home/dex/app/tmp/pika_demo` adapter smoke test.
+- Decided to add named workspace local-first mode because PIKA raw directories exceed multipart file-count limits and server/client are expected to run on the same host.
+- Implemented named workspace local-first source flow: `WorkspaceManager`, `/api/workspaces` browsing APIs, `/api/workspaces/source` activation, CLI `--workspace NAME=PATH`, and frontend workspace selector with visible mode text.
+- Kept upload as fallback, but workspace mode is now the recommended path for PIKA raw because it avoids multipart file-count limits and supports refreshing newly collected episodes.
+- Added workspace tests for HDF5 activation, PIKA raw activation, path escape rejection, and CLI workspace parsing; verified `pytest` (`23 passed`), `node --check`, `compileall`, and file line-count scan.
+- Refined workspace source UI after real use: workspace directory listings now select the first entry in React state instead of only visually showing it, so `Use selected` submits `pos1/pos2` instead of the parent directory. Upload fallback is collapsed behind `Show upload tools` by default. Raw workspace adapter auto-detection is intentionally deferred; users should still select `PIKA Raw` manually for raw directories.
+- Moved `Input format` above workspace selection so users choose adapter intent before choosing a local path. Added source revision reload semantics and frame URL cache busting so switching between sources with the same episode id still reloads PIKA metadata and triggers frame requests.
+- 修复 PIKA raw 自动播放时画面不更新的 bug。根因是 `get_camera_frame` 每次请求都调用 `load_episode()` 重建全部 PolicyFrame 对象（冗余校验），且 `image_file_to_png` 将 JPEG 强制重编码为 PNG（体积膨胀 4 倍、耗时 ~65ms/帧）。修复：`EpisodeSession` 增加 episode 缓存（`_episode_cache` / `_metadata_cache`），`PikaRawEpisodeAdapter.get_image_frame` 改为使用 `serve_image_file` 原样透传 JPEG/PNG，`get_camera_frame` 响应头加入 `Cache-Control: max-age=0, must-revalidate`。优化后单帧响应从 ~65-130ms 降至 ~1ms，图片体积从 ~414KB 降至 ~107KB，`pytest` 保持 23 passed。
+- Remaining next step: implement image-preserving HDF5 export from adapter-backed `PolicyEpisode`/frame references.

@@ -9,7 +9,7 @@ from pathlib import Path
 from pydantic import BaseModel, Field
 
 from univis.core.components import ComponentInfo
-from univis.domain.policy_episode import PolicyEpisode, PolicyEpisodeMetadata
+from univis.domain.policy_episode import Annotation, PolicyEpisode, PolicyEpisodeMetadata
 
 
 class EpisodeSource(BaseModel):
@@ -128,3 +128,21 @@ class RawEpisodeAdapter(ABC):
             self.get_image_frame(episode_id, camera_key, start + offset, source)
             for offset in range(total)
         ]
+
+    def update_annotation(
+        self,
+        episode_id: str,
+        annotation: Annotation,
+        source: EpisodeSource | None = None,
+    ) -> Annotation:
+        """Persist an episode annotation when the adapter supports writeback.
+
+        Inputs:
+            episode_id: Stable episode identifier.
+            annotation: Updated annotation payload.
+            source: Optional adapter source descriptor.
+        Output:
+            Saved annotation payload.
+        """
+
+        raise NotImplementedError(f"annotation update is not supported by {self.info().name}")

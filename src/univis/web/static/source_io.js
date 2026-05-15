@@ -10,6 +10,27 @@
     return fetchJson(`/api/uploads/sources/${uploadId}/activate`, { method: "POST" });
   }
 
+  async function listWorkspaces() {
+    return fetchJson("/api/workspaces");
+  }
+
+  async function listWorkspaceChildren(workspace, path) {
+    const query = new URLSearchParams({ path: path || "" });
+    return fetchJson(`/api/workspaces/${encodeURIComponent(workspace)}/children?${query}`);
+  }
+
+  async function activateWorkspaceSource(inputFormat, workspace, relativePath) {
+    return fetchJson("/api/workspaces/source", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        input_adapter: inputFormat,
+        workspace,
+        relative_path: relativePath || "",
+      }),
+    });
+  }
+
   async function uploadSource(inputFormat, entries) {
     if (!entries.length) throw new Error("Choose a local source first");
     if (inputFormat === "HDF5EpisodeAdapter" && !entries.some(isHdf5Entry)) {
@@ -45,17 +66,11 @@
       throw new Error("This browser does not support safe directory selection");
     }
     const handle = await window.showDirectoryPicker();
-    const entries = [];
-    let nestedDirs = 0;
-    for await (const entry of handle.values()) {
-      if (entry.kind === "directory") {
-        nestedDirs += 1;
-      } else if (inputFormat !== "HDF5EpisodeAdapter" || hdf5Pattern.test(entry.name)) {
-        const file = await entry.getFile();
-        entries.push({ file, relativePath: `${handle.name}/${file.name}` });
-      }
-    }
+    const entries = inputFormat === "HDF5EpisodeAdapter"
+      ? await pickTopLevelHdf5Entries(handle)
+      : await walkDirectory(handle, handle.name);
     if (inputFormat === "HDF5EpisodeAdapter" && !entries.length) {
+      const nestedDirs = await countChildDirectories(handle);
       const detail = nestedDirs
         ? "HDF5 files must be directly inside the selected directory"
         : "Selected directory does not contain HDF5 files";
@@ -63,9 +78,40 @@
     }
     return {
       entries,
-      label: `${handle.name} · ${entries.length} top-level file(s) selected`,
+      label: `${handle.name} · ${entries.length} file(s) selected`,
       error: "",
     };
+  }
+
+  async function pickTopLevelHdf5Entries(handle) {
+    const entries = [];
+    for await (const entry of handle.values()) {
+      if (entry.kind === "file" && hdf5Pattern.test(entry.name)) {
+        entries.push({ file: await entry.getFile(), relativePath: `${handle.name}/${entry.name}` });
+      }
+    }
+    return entries;
+  }
+
+  async function walkDirectory(handle, prefix) {
+    const entries = [];
+    for await (const entry of handle.values()) {
+      const relativePath = `${prefix}/${entry.name}`;
+      if (entry.kind === "file") {
+        entries.push({ file: await entry.getFile(), relativePath });
+      } else {
+        entries.push(...await walkDirectory(entry, relativePath));
+      }
+    }
+    return entries;
+  }
+
+  async function countChildDirectories(handle) {
+    let count = 0;
+    for await (const entry of handle.values()) {
+      if (entry.kind === "directory") count += 1;
+    }
+    return count;
   }
 
   async function pickHdf5File() {
@@ -105,7 +151,10 @@
   }
 
   window.UniVisSourceIO = {
+    activateWorkspaceSource,
     activateUploadedSource,
+    listWorkspaceChildren,
+    listWorkspaces,
     listUploadedSources,
     pickDirectory,
     pickHdf5File,

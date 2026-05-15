@@ -135,7 +135,12 @@ class Phase00Router:
         camera_key: str,
         frame_index: int,
     ) -> Response:
-        """Return one real adapter frame."""
+        """Return one adapter frame with cache-busting headers.
+
+        The endpoint uses `Cache-Control: max-age=0, must-revalidate`
+        so browsers revalidate every frame URL on each src change,
+        even under rapid autoplay intervals.
+        """
 
         try:
             meta = self.session.get_metadata(episode_id)
@@ -153,7 +158,11 @@ class Phase00Router:
             image = self.session.get_image_frame(episode_id, camera_key, idx)
         except Exception as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
-        return Response(content=image.data, media_type=image.media_type)
+        return Response(
+            content=image.data,
+            media_type=image.media_type,
+            headers={"Cache-Control": "max-age=0, must-revalidate"},
+        )
 
     def get_camera_frames(
         self,

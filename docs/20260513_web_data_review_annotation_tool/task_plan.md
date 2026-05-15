@@ -15,6 +15,7 @@
 | Phase 001 viewer polish | complete | Added directory picker placeholder, component-driven format selectors, episode status/progress list, autoplay, and layout fixes. |
 | Phase 01 core abstractions | complete | Added adapter/exporter/reachability base classes, mock implementations, registry, model validation, and tests. |
 | Phase 02 HDF5 foundation | in progress | Round-trip HDF5 adapter/exporter, prompt writeback, and browser directory upload to server staging are complete; real compressed image serving remains. |
+| Phase 03 PIKA raw adapter | in progress | First adapter pass plus named workspace local-first source flow are implemented. Real image-preserving HDF5 export remains next. |
 
 ## Decisions
 | Topic | Decision |
@@ -25,3 +26,5 @@
 ## Errors Encountered
 | Error | Attempt | Resolution |
 | --- | --- | --- |
+| Phase03 unit test expected frame count | First run expected 4 frames after trimming | Fixture actually keeps 6 frames with converter-compatible trim logic; updated assertion to match behavior. |
+| Registry test still expected only HDF5 adapter | Full test run after PIKA registration | Updated registry expectation to include PikaRawEpisodeAdapter. |
