@@ -25,6 +25,7 @@
 
 .source-panel,
 .form-card {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -39,6 +40,7 @@
 .source-panel input,
 .source-panel select,
 .camera-title select,
+.form-card input,
 .form-card textarea {
   width: 100%;
   min-width: 0;

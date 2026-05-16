@@ -93,7 +93,7 @@
     const modeText = props.sourceMode || "Mode: no source selected";
 
     function loadWorkspaceChildren(name, path) {
-      SourceIO.listWorkspaceChildren(name, path)
+      window.UniVisLoading.withLoading("Loading directory...", () => SourceIO.listWorkspaceChildren(name, path))
         .then((payload) => {
           const entries = payload.entries || [];
           setWorkspaceEntries(entries);
@@ -110,10 +110,9 @@
 
     async function activateWorkspacePath(path) {
       try {
-        const payload = await SourceIO.activateWorkspaceSource(
-          props.inputFormat,
-          workspaceName,
-          path,
+        const payload = await window.UniVisLoading.withLoading(
+          "Loading episodes...",
+          () => SourceIO.activateWorkspaceSource(props.inputFormat, workspaceName, path),
         );
         props.onApplySourcePayload(payload, `Mode: workspace · ${workspaceName}:${path || "/"}`);
       } catch (error) {
@@ -194,10 +193,15 @@
 
   function UploadTools(props) {
     const sources = props.sources || [];
+    const sourceOptions = props.selectedInputInfo?.capabilities?.source || {};
     return h("div", { className: "upload-tools" },
       h("div", { className: "source-row" },
         h("button", { className: "ghost", onClick: props.onPickDirectory }, "Choose directory"),
-        h("button", { className: "ghost", onClick: props.onPickFile }, "Choose file"),
+        h("button", {
+          className: "ghost",
+          onClick: props.onPickFile,
+          disabled: !sourceOptions.supports_file_upload,
+        }, "Choose file"),
       ),
       h("p", { className: "meta" }, props.directoryLabel || "No directory selected"),
       props.sourceMessage ? h("p", { className: "source-message" }, props.sourceMessage) : null,

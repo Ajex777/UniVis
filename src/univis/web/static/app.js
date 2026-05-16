@@ -18,8 +18,8 @@ function App() {
   const [message, setMessage] = useState("");
   const [collapsed, setCollapsed] = useState(false);
   const [playSpeed, setPlaySpeed] = useState(0);
-  const [inputFormat, setInputFormat] = useState("HDF5EpisodeAdapter");
-  const [outputFormat, setOutputFormat] = useState("HDF5EpisodeExporter");
+  const [inputFormat, setInputFormat] = useState("");
+  const [outputFormat, setOutputFormat] = useState("");
   const [directoryLabel, setDirectoryLabel] = useState("");
   const [directoryFiles, setDirectoryFiles] = useState([]);
   const [sourceMessage, setSourceMessage] = useState("");
@@ -41,7 +41,8 @@ function App() {
         setUploadSources(sources);
         setSelectedUploadId(sources[0]?.upload_id || "");
         if (items.length) setEpisodeId(items[0].episode_id);
-        setInputFormat(reg.input_adapters[0]?.name || "HDF5EpisodeAdapter");
+        setInputFormat(reg.input_adapters[0]?.name || "");
+        setOutputFormat(reg.output_exporters[0]?.name || "");
       }).catch((error) => setMessage(error.message));
   }, []);
 
@@ -76,6 +77,8 @@ function App() {
     return trajectory.reachability.reasons[frameIndex] || "";
   }, [trajectory, frameIndex]);
 
+  const selectedInputInfo = useMemo(() => registry?.input_adapters?.find((item) => item.name === inputFormat) || null, [registry, inputFormat]);
+
   const saveAnnotation = async () => {
     const saved = await fetchJson(`/api/episodes/${episodeId}/annotation`, {
       method: "PATCH",
@@ -89,7 +92,8 @@ function App() {
   const uploadSource = async () => {
     try {
       setMessage(`Uploading ${directoryFiles.length} file(s)...`);
-      await applySourcePayload(await SourceIO.uploadSource(inputFormat, directoryFiles), "Mode: upload fallback");
+      const payload = await window.UniVisLoading.withLoading("Uploading and loading episodes...", () => SourceIO.uploadSource(inputFormat, directoryFiles, selectedInputInfo));
+      await applySourcePayload(payload, "Mode: upload fallback");
       const sources = await SourceIO.listUploadedSources();
       setUploadSources(sources);
       setSelectedUploadId(sources[0]?.upload_id || "");
@@ -98,10 +102,9 @@ function App() {
       setMessage(error.message);
     }
   };
-
   const pickDirectory = async () => {
     try {
-      applySelection(await SourceIO.pickDirectory(inputFormat));
+      applySelection(await SourceIO.pickDirectory(selectedInputInfo));
     } catch (error) {
       if (error.name !== "AbortError") {
         setSourceMessage(error.message);
@@ -109,20 +112,19 @@ function App() {
       }
     }
   };
-
   const pickFile = async () => {
     try {
-      applySelection(await SourceIO.pickHdf5File(inputFormat));
+      applySelection(await SourceIO.pickFile(selectedInputInfo));
     } catch (error) {
       setSourceMessage(error.message);
       setMessage(error.message);
     }
   };
-
   const activateUploadedSource = async () => {
     if (!selectedUploadId) return;
     try {
-      await applySourcePayload(await SourceIO.activateUploadedSource(selectedUploadId), "Mode: uploaded source");
+      const payload = await window.UniVisLoading.withLoading("Loading uploaded source...", () => SourceIO.activateUploadedSource(selectedUploadId));
+      await applySourcePayload(payload, "Mode: uploaded source");
     } catch (error) {
       setSourceMessage(error.message);
       setMessage(error.message);
@@ -148,6 +150,7 @@ function App() {
 
   const sourceControls = h(SourceControls, {
     registry,
+    selectedInputInfo,
     inputFormat,
     outputFormat,
     directoryLabel,
@@ -229,6 +232,7 @@ function App() {
     h("aside", { className: "inspector" },
       h("div", { className: "form-card" }, h("strong", null, metadata.title), h("p", { className: "meta" }, `Frame ${frameIndex + 1}/${metadata.num_frames}`), currentReason ? h("p", { className: "reason" }, currentReason) : null),
       h("div", { className: "form-card" }, h("strong", null, "Gripper"), h(GripperChart, { trajectory, frameIndex })),
+      h(window.UniVisConversionComponents.ConversionPanel, { episodeId, outputFormat, onMessage: setMessage }),
       h("div", { className: "form-card" },
         h("strong", null, "Annotation"),
         h("textarea", { value: annotation.language_prompt, onChange: (event) => setAnnotation({ ...annotation, language_prompt: event.target.value }) }),

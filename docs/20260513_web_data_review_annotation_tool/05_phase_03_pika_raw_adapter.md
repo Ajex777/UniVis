@@ -21,11 +21,11 @@
 - `instructions.json` 已支持写回。写回时优先更新已有的 `instruction/text/prompt/language_prompt` 字段；没有这些字段时新增 `language_prompt`。
 - 前端目录选择在 `PIKA Raw` 模式下会递归收集选中目录内文件并上传到 server staging，然后由 adapter 扫描。
 - 已用 `/home/dex/app/tmp/pika_demo` 做真实目录烟测：默认参数下可识别 2 条 synchronized PIKA episode。
+- 已实现 adapter-backed image-preserving HDF5 export：PIKA raw 图像仍由 adapter 懒加载，`HDF5EpisodeExporter` 写出真实 chunked image datasets。
 
 ## Remaining Work
 
 - 与 legacy converter 进行更严格的 fixture 回归比对，确认 qpos 与 frame path 选择逐帧一致。
-- 实现 image-preserving HDF5 export：当前 `HDF5EpisodeExporter` 仍只写 qpos/action/metadata，不写 raw 图像 chunk。
 - 为大 raw 目录上传增加分批/分片机制，避免一次性 multipart 过大。
 
 ## Acceptance

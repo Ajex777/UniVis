@@ -7,6 +7,7 @@ import fnmatch
 from pathlib import Path
 from typing import Any
 
+from univis.domain.policy_episode import Annotation
 from univis.utils.json_io import read_json, write_json
 from univis.utils.sorting import natural_sort_key
 
@@ -83,17 +84,47 @@ def collect_pika_episode_dirs(root: Path, pattern: str = DEFAULT_PATTERN) -> lis
 def load_instruction(episode_dir: Path) -> str:
     """Extract the first language instruction from `instructions.json`."""
 
-    path = Path(episode_dir) / "instructions.json"
-    if not path.exists():
-        return ""
-    try:
-        return _extract_text(read_json(path))
-    except Exception:
-        return ""
+    return load_annotation(episode_dir).language_prompt
 
 
 def write_instruction(episode_dir: Path, language_prompt: str) -> None:
     """Write an updated prompt back to `instructions.json`."""
+
+    saved = load_annotation(episode_dir).model_copy(update={"language_prompt": language_prompt})
+    write_annotation(episode_dir, saved)
+
+
+def load_annotation(episode_dir: Path) -> Annotation:
+    """Load UniVis annotation metadata from a PIKA raw episode.
+
+    Inputs:
+        episode_dir: PIKA episode directory.
+    Output:
+        Annotation with prompt from legacy fields and review state from the
+        optional `univis_annotation` payload.
+    """
+
+    path = Path(episode_dir) / "instructions.json"
+    if not path.exists():
+        return Annotation()
+    try:
+        payload = read_json(path)
+        base = _extract_univis_annotation(payload)
+        base["language_prompt"] = _extract_text(payload) or base.get("language_prompt", "")
+        return Annotation(**base)
+    except Exception:
+        return Annotation()
+
+
+def write_annotation(episode_dir: Path, annotation: Annotation) -> None:
+    """Persist prompt plus review metadata in `instructions.json`.
+
+    Inputs:
+        episode_dir: PIKA episode directory.
+        annotation: Full UniVis annotation state.
+    Output:
+        Mutates or creates `instructions.json`.
+    """
 
     path = Path(episode_dir) / "instructions.json"
     payload: Any = {}
@@ -102,7 +133,15 @@ def write_instruction(episode_dir: Path, language_prompt: str) -> None:
             payload = read_json(path)
         except Exception:
             payload = {}
-    write_json(path, _set_text(payload, language_prompt))
+    updated = _set_text(payload, annotation.language_prompt)
+    if isinstance(updated, dict):
+        updated["univis_annotation"] = annotation.model_dump()
+    else:
+        updated = {
+            "language_prompt": annotation.language_prompt,
+            "univis_annotation": annotation.model_dump(),
+        }
+    write_json(path, updated)
 
 
 def _extract_text(payload: Any) -> str:
@@ -134,3 +173,9 @@ def _set_text(payload: Any, text: str) -> Any:
         payload["language_prompt"] = text
         return payload
     return {"language_prompt": text}
+
+
+def _extract_univis_annotation(payload: Any) -> dict[str, Any]:
+    if isinstance(payload, dict) and isinstance(payload.get("univis_annotation"), dict):
+        return dict(payload["univis_annotation"])
+    return {}

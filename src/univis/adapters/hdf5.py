@@ -32,6 +32,9 @@ class HDF5EpisodeAdapter(RawEpisodeAdapter):
             name="HDF5EpisodeAdapter",
             label="HDF5 Episode",
             description="Reads HDF5 episode files into PolicyEpisode objects.",
+            capabilities={
+                "source": {"directory_upload": "top_level_matching", "file_extensions": [".hdf5", ".h5"], "supports_file_upload": True},
+            },
         )
 
     def list_metadata(self, source: EpisodeSource | None = None) -> list[PolicyEpisodeMetadata]:

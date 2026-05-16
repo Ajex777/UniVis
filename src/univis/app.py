@@ -10,12 +10,14 @@ from fastapi import FastAPI
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
+from univis.api.conversions import ConversionRouter
 from univis.api.routes import Phase00Router
 from univis.api.uploads import UploadRouter
 from univis.api.workspaces import WorkspaceRouter
 from univis.adapters.hdf5 import HDF5EpisodeAdapter
 from univis.adapters.pika_raw import PikaRawEpisodeAdapter
 from univis.core.components import ComponentRegistry
+from univis.core.conversions import ConversionService
 from univis.core.episode_session import EpisodeSession
 from univis.core.uploads import UploadManager
 from univis.core.workspaces import WorkspaceManager
@@ -59,13 +61,19 @@ class UniVisAppContext:
             adapters=self.adapters,
             default_adapter_name=self.hdf5_adapter.info().name,
         )
+        self.exporters = [HDF5EpisodeExporter(), MockEpisodeExporter()]
         self.registry = ComponentRegistry(
             input_adapters=self.adapters,
-            output_exporters=[HDF5EpisodeExporter(), MockEpisodeExporter()],
+            output_exporters=self.exporters,
             reachability_backends=[MockReachabilityBackend()],
         )
         self.upload_manager = UploadManager(self.uploads_root)
         self.workspace_manager = WorkspaceManager(workspaces)
+        self.conversion_service = ConversionService(
+            self.session,
+            self.exporters,
+            package_dir.parents[1] / ".univis" / "exports",
+        )
 
     def create_app(self) -> FastAPI:
         """Create the FastAPI application.
@@ -80,6 +88,7 @@ class UniVisAppContext:
         app.include_router(Phase00Router(self.session, self.registry).router)
         app.include_router(UploadRouter(self.upload_manager, self.session).router)
         app.include_router(WorkspaceRouter(self.workspace_manager, self.session).router)
+        app.include_router(ConversionRouter(self.conversion_service).router)
         app.mount("/static", StaticFiles(directory=str(self.static_dir)), name="static")
 
         @app.get("/", include_in_schema=False)

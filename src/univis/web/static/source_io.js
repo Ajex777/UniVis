@@ -1,6 +1,5 @@
 (function () {
   const { fetchJson } = window.UniVisApi;
-  const hdf5Pattern = /\.(hdf5|h5)$/i;
 
   async function listUploadedSources() {
     return fetchJson("/api/uploads/sources");
@@ -31,10 +30,11 @@
     });
   }
 
-  async function uploadSource(inputFormat, entries) {
+  async function uploadSource(inputFormat, entries, adapterInfo) {
     if (!entries.length) throw new Error("Choose a local source first");
-    if (inputFormat === "HDF5EpisodeAdapter" && !entries.some(isHdf5Entry)) {
-      throw new Error("Selected source does not contain HDF5 files");
+    const options = sourceOptions(adapterInfo);
+    if (options.file_extensions?.length && !entries.some((item) => matchesExtension(item, options))) {
+      throw new Error("Selected source does not contain supported files");
     }
     const totalSize = entries.reduce((sum, item) => sum + item.file.size, 0);
     const first = entries[0]?.relativePath || entries[0]?.file.name || "";
@@ -61,20 +61,22 @@
     return fetchJson(`/api/uploads/${upload.upload_id}/complete`, { method: "POST" });
   }
 
-  async function pickDirectory(inputFormat) {
+  async function pickDirectory(adapterInfo) {
     if (!window.showDirectoryPicker) {
       throw new Error("This browser does not support safe directory selection");
     }
     const handle = await window.showDirectoryPicker();
-    const entries = inputFormat === "HDF5EpisodeAdapter"
-      ? await pickTopLevelHdf5Entries(handle)
+    const options = sourceOptions(adapterInfo);
+    const topLevelOnly = options.directory_upload === "top_level_matching";
+    const entries = topLevelOnly
+      ? await pickTopLevelMatchingEntries(handle, options)
       : await walkDirectory(handle, handle.name);
-    if (inputFormat === "HDF5EpisodeAdapter" && !entries.length) {
+    if (topLevelOnly && !entries.length) {
       const nestedDirs = await countChildDirectories(handle);
       const detail = nestedDirs
-        ? "HDF5 files must be directly inside the selected directory"
-        : "Selected directory does not contain HDF5 files";
-      return { entries: [], label: `${handle.name} · invalid for HDF5`, error: detail };
+        ? "Supported files must be directly inside the selected directory"
+        : "Selected directory does not contain supported files";
+      return { entries: [], label: `${handle.name} · invalid source`, error: detail };
     }
     return {
       entries,
@@ -83,10 +85,10 @@
     };
   }
 
-  async function pickTopLevelHdf5Entries(handle) {
+  async function pickTopLevelMatchingEntries(handle, options) {
     const entries = [];
     for await (const entry of handle.values()) {
-      if (entry.kind === "file" && hdf5Pattern.test(entry.name)) {
+      if (entry.kind === "file" && matchesName(entry.name, options)) {
         entries.push({ file: await entry.getFile(), relativePath: `${handle.name}/${entry.name}` });
       }
     }
@@ -114,20 +116,25 @@
     return count;
   }
 
-  async function pickHdf5File() {
+  async function pickFile(adapterInfo) {
+    const options = sourceOptions(adapterInfo);
+    if (!options.supports_file_upload) throw new Error("Selected input does not support file upload");
+    const extensions = options.file_extensions || [];
     if (window.showOpenFilePicker) {
       const [handle] = await window.showOpenFilePicker({
         multiple: false,
-        types: [{ description: "HDF5", accept: { "application/octet-stream": [".hdf5", ".h5"] } }],
+        types: [{ description: adapterInfo?.label || "Source", accept: { "application/octet-stream": extensions } }],
       });
-      return fileSelection(await handle.getFile());
+      return fileSelection(await handle.getFile(), options);
     }
-    const file = await browserFileInput();
-    return fileSelection(file);
+    const file = await browserFileInput(options);
+    return fileSelection(file, options);
   }
 
-  function fileSelection(file) {
-    if (!file || !hdf5Pattern.test(file.name)) throw new Error("Choose a .hdf5 or .h5 file");
+  function fileSelection(file, options) {
+    if (!file || !matchesName(file.name, options)) {
+      throw new Error(`Choose a supported file${extensionHint(options)}`);
+    }
     return {
       entries: [{ file, relativePath: file.name }],
       label: `${file.name} · single file selected`,
@@ -135,19 +142,34 @@
     };
   }
 
-  function browserFileInput() {
+  function browserFileInput(options) {
     return new Promise((resolve, reject) => {
       const input = document.createElement("input");
       input.type = "file";
-      input.accept = ".hdf5,.h5";
+      input.accept = (options.file_extensions || []).join(",");
       input.onchange = () => resolve(input.files[0]);
       input.oncancel = () => reject(new Error("File selection cancelled"));
       input.click();
     });
   }
 
-  function isHdf5Entry(item) {
-    return hdf5Pattern.test(item.relativePath || item.file.name);
+  function sourceOptions(adapterInfo) {
+    return adapterInfo?.capabilities?.source || {};
+  }
+
+  function matchesExtension(item, options) {
+    return matchesName(item.relativePath || item.file.name, options);
+  }
+
+  function matchesName(name, options) {
+    const extensions = options.file_extensions || [];
+    if (!extensions.length) return true;
+    return extensions.some((extension) => String(name).toLowerCase().endsWith(extension.toLowerCase()));
+  }
+
+  function extensionHint(options) {
+    const extensions = options.file_extensions || [];
+    return extensions.length ? ` (${extensions.join(", ")})` : "";
   }
 
   window.UniVisSourceIO = {
@@ -157,7 +179,7 @@
     listWorkspaces,
     listUploadedSources,
     pickDirectory,
-    pickHdf5File,
+    pickFile,
     uploadSource,
   };
 })();

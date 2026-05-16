@@ -11,9 +11,9 @@ from univis.adapters.pika_manifest import (
     CAM_LEFT_WRIST,
     CAM_RIGHT_WRIST,
     collect_pika_episode_dirs,
-    load_instruction,
+    load_annotation,
     scan_pika_episode,
-    write_instruction,
+    write_annotation,
 )
 from univis.adapters.pika_sync import PikaEpisodeSynchronizer, PikaSyncOptions, PikaSyncResult
 from univis.core.components import ComponentInfo
@@ -52,6 +52,12 @@ class PikaRawEpisodeAdapter(RawEpisodeAdapter):
             name="PikaRawEpisodeAdapter",
             label="PIKA Raw",
             description="Reads PIKA raw folders into synchronized PolicyEpisode objects.",
+            capabilities={
+                "source": {
+                    "directory_upload": "recursive",
+                    "supports_file_upload": False,
+                },
+            },
         )
 
     def list_metadata(self, source: EpisodeSource | None = None) -> list[PolicyEpisodeMetadata]:
@@ -126,8 +132,8 @@ class PikaRawEpisodeAdapter(RawEpisodeAdapter):
         """Write annotation text back to `instructions.json`."""
 
         path = self.path_for_episode(episode_id, source)
-        write_instruction(path, annotation.language_prompt)
-        return annotation
+        write_annotation(path, annotation)
+        return self._metadata_for_path(path).annotation
 
     def path_for_episode(self, episode_id: str, source: EpisodeSource | None) -> Path:
         """Resolve a stable episode id to a raw episode directory."""
@@ -158,7 +164,7 @@ class PikaRawEpisodeAdapter(RawEpisodeAdapter):
             num_frames=int(sync.qpos.shape[0]),
             fps=self._fps(sync.timestamps),
             cameras=self._cameras(sync),
-            annotation=Annotation(language_prompt=load_instruction(path)),
+            annotation=load_annotation(path),
         )
 
     def _sync(self, path: Path) -> PikaSyncResult:

@@ -14,8 +14,10 @@
 | Phase 00 fake viewer | complete | Built FastAPI + React fake `PolicyEpisode` viewer in `/home/dex/app/UniVis`. |
 | Phase 001 viewer polish | complete | Added directory picker placeholder, component-driven format selectors, episode status/progress list, autoplay, and layout fixes. |
 | Phase 01 core abstractions | complete | Added adapter/exporter/reachability base classes, mock implementations, registry, model validation, and tests. |
-| Phase 02 HDF5 foundation | in progress | Round-trip HDF5 adapter/exporter, prompt writeback, and browser directory upload to server staging are complete; real compressed image serving remains. |
-| Phase 03 PIKA raw adapter | in progress | First adapter pass plus named workspace local-first source flow are implemented. Real image-preserving HDF5 export remains next. |
+| Phase 02 HDF5 foundation | complete | Round-trip adapter/exporter, prompt writeback, browser upload, script-compatible image serving, and adapter-backed image export are implemented. |
+| Phase 03 PIKA raw adapter | in progress | First adapter pass, named workspace local-first source flow, and PIKA raw -> HDF5 image-preserving export are implemented. Legacy converter regression remains. |
+| Phase 04 annotation review | in progress | Prompt/status/notes/tags persist for PIKA raw and HDF5 through adapter writeback; list filtering remains. |
+| Phase 05 conversion workflow | in progress | Background single current-episode and accepted-only batch conversion APIs/UI are implemented with job progress and `conversion_report.json`; overwrite/skip options remain. |
 
 ## Decisions
 | Topic | Decision |

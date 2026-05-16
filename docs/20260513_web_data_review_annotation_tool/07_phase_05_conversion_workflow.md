@@ -28,6 +28,15 @@
 - Report test：`conversion_report.json` 字段完整。
 - Viewer regression：导出后立即用 HDF5 adapter 加载。
 
+## Current Implementation Notes
+
+- 已新增 `ConversionService` 和 `/api/conversions/episodes/{episode_id}`、`/api/conversions/accepted`。
+- 转换以后台 job 运行；`/api/conversions/jobs` 和 `/api/conversions/jobs/{job_id}` 返回状态、`completed/total`、成功/失败数和进度。
+- 转换链路使用当前 active adapter/source 加载 `PolicyEpisode`，通过 registry 中选择的 exporter 输出；支持 exporter 通过通用 image provider hook 懒加载真实图像。
+- 前端 inspector 已提供 `Export current` 和 `Export accepted`，输出格式来自 registry 的 `output_exporters`，不绑定具体 exporter 类名；右下角导出记录面板会轮询 job 并显示进度条。
+- 每次转换会在输出目录写入 `conversion_report.json`，记录输入 adapter、输入 root、输出 root、成功/失败条目。
+- 当前尚未实现 skip/overwrite 策略选择、异步任务队列和细粒度进度流。
+
 ## Out Of Scope
 
 - 不实现 LeRobot exporter。

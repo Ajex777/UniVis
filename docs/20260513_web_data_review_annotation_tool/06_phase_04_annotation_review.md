@@ -20,6 +20,13 @@
 - episode 列表可以按审查状态过滤。
 - 不存在片段级裁剪入口，避免第一版范围膨胀。
 
+## Current Implementation Notes
+
+- 前端 inspector 已支持编辑语言指令、切换 `pending/accepted/rejected` 并保存。
+- HDF5 adapter 会写回 `language_prompt` 和 `univis.attrs["annotation_json"]`。
+- PIKA raw adapter 会在 `instructions.json` 保持 legacy prompt 字段，同时写入 `univis_annotation` 保存 review status、notes 和 quality tags。
+- 当前尚未实现 episode 列表按审查状态过滤。
+
 ## Tests
 
 - Annotation API test：create/read/update status 和 prompt。

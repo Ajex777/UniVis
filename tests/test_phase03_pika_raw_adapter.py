@@ -9,11 +9,13 @@ from PIL import Image
 
 from pika_fixtures import write_pika_raw_episode
 from univis.adapters.base import EpisodeSource
+from univis.adapters.hdf5 import HDF5EpisodeAdapter
 from univis.adapters.pika_manifest import scan_pika_episode
 from univis.adapters.pika_raw import PikaRawEpisodeAdapter
 from univis.adapters.pika_sync import PikaSyncOptions
 from univis.app import create_app
 from univis.domain.policy_episode import Annotation
+from univis.exporters.hdf5 import HDF5EpisodeExporter
 from univis.utils.hdf5_episode import frames_to_qpos
 
 
@@ -104,3 +106,38 @@ def test_api_can_upload_and_view_pika_raw_directory(tmp_path: Path) -> None:
     frame = client.get(f"/api/episodes/{episode_dir.name}/frame/cam_right_wrist/0")
     assert frame.status_code == 200
     assert frame.headers["content-type"].startswith("image/png")
+
+
+def test_pika_raw_exports_hdf5_with_real_images(tmp_path: Path) -> None:
+    """Verify adapter-backed HDF5 export preserves synchronized image frames."""
+
+    episode_dir = write_pika_raw_episode(tmp_path / "raw", frames=8)
+    source = EpisodeSource(root_path=tmp_path / "raw")
+    adapter = PikaRawEpisodeAdapter(PikaSyncOptions(min_frames=3))
+    episode = adapter.load_episode(episode_dir.name, source)
+    output_root = tmp_path / "exported"
+
+    result = HDF5EpisodeExporter(
+        image_adapter=adapter,
+        image_source=source,
+        image_chunk_size=2,
+    ).export(episode, output_root)
+
+    hdf5_adapter = HDF5EpisodeAdapter()
+    hdf5_source = EpisodeSource(root_path=output_root)
+    loaded = hdf5_adapter.load_episode(episode.metadata.episode_id, hdf5_source)
+    np.testing.assert_allclose(frames_to_qpos(loaded.frames), frames_to_qpos(episode.frames))
+
+    exported_frame = hdf5_adapter.get_image_frame(
+        episode.metadata.episode_id,
+        "cam_left_wrist",
+        0,
+        hdf5_source,
+    )
+    sync = adapter.synchronizer.synchronize(scan_pika_episode(episode_dir))
+    expected = Image.open(sync.image_paths["cam_left_wrist"][0]).convert("RGB")
+    actual = Image.open(BytesIO(exported_frame.data)).convert("RGB")
+
+    assert result.success is True
+    assert actual.size == expected.size
+    np.testing.assert_array_equal(np.asarray(actual), np.asarray(expected))

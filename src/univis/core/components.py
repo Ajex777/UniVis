@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class ComponentInfo(BaseModel):
@@ -14,6 +14,7 @@ class ComponentInfo(BaseModel):
         name: Stable class-like identifier.
         label: Human-friendly display label.
         description: Short explanation for UI dropdowns and diagnostics.
+        capabilities: UI-safe behavior flags that avoid component-specific branching.
     Output:
         JSON-ready metadata shared by adapters, exporters, and backends.
     """
@@ -21,6 +22,7 @@ class ComponentInfo(BaseModel):
     name: str
     label: str
     description: str = ""
+    capabilities: dict[str, object] = Field(default_factory=dict)
 
 
 @dataclass
@@ -39,7 +41,7 @@ class ComponentRegistry:
     output_exporters: list[object] = field(default_factory=list)
     reachability_backends: list[object] = field(default_factory=list)
 
-    def api_payload(self) -> dict[str, list[dict[str, str]]]:
+    def api_payload(self) -> dict[str, list[dict[str, object]]]:
         """Return registry contents for API consumers.
 
         Inputs:
@@ -54,7 +56,7 @@ class ComponentRegistry:
             "reachability_backends": self._dump(self.reachability_backends),
         }
 
-    def _dump(self, components: list[object]) -> list[dict[str, str]]:
+    def _dump(self, components: list[object]) -> list[dict[str, object]]:
         """Serialize component info.
 
         Inputs:
