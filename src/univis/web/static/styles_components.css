@@ -85,15 +85,15 @@
   background: var(--panel-solid);
 }
 
-.episode-button.converting {
-  background: linear-gradient(90deg, var(--converted) var(--progress), var(--panel-solid) var(--progress));
+.episode-button.review-pending {
+  background: rgba(167, 127, 28, 0.12);
 }
 
-.episode-button.converted {
+.episode-button.review-accepted {
   background: rgba(20, 120, 95, 0.18);
 }
 
-.episode-button.rejected {
+.episode-button.review-rejected {
   background: rgba(155, 47, 63, 0.14);
 }
 

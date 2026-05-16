@@ -41,24 +41,21 @@
   }
 
   /**
-   * Render a conversion-state episode card.
+   * Render a review-state episode card.
    * Input: episode item, active id, and click handler.
-   * Output: Button element with status color/progress styling.
+   * Output: Button element with review status color and text.
    */
   function EpisodeButton({ item, active, onClick }) {
-    const conversion = item.conversion || { status: "pending", progress: 0 };
-    const progress = Math.max(0, Math.min(1, conversion.progress || 0));
-    const style = { "--progress": `${Math.round(progress * 100)}%` };
+    const reviewStatus = item.annotation?.review_status || "pending";
     return h("button", {
-      className: `episode-button ${active ? "active" : ""} ${conversion.status}`,
-      style,
+      className: `episode-button ${active ? "active" : ""} review-${reviewStatus}`,
       onClick,
     },
       h("strong", null, item.title),
       h("p", { className: "meta" },
-        `${item.num_frames} frames · ${item.cameras.length} cameras`,
+        `${item.num_frames} frames · ${item.cameras.length} cameras · ${reviewStatus}`,
       ),
-      h("span", { className: "status-pill" }, conversion.status),
+      h("span", { className: "status-pill" }, `Review: ${reviewStatus}`),
     );
   }
 

@@ -15,6 +15,7 @@ function App() {
   const [frameIndex, setFrameIndex] = useState(0);
   const [slots, setSlots] = useState({ main: "", left: "", right: "" });
   const [annotation, setAnnotation] = useState(null);
+  const [annotationMessage, setAnnotationMessage] = useState("");
   const [message, setMessage] = useState("");
   const [collapsed, setCollapsed] = useState(false);
   const [playSpeed, setPlaySpeed] = useState(0);
@@ -51,6 +52,7 @@ function App() {
     setMetadata(null);
     setTrajectory(null);
     setAnnotation(null);
+    setAnnotationMessage("");
     Promise.all([
       fetchJson(`/api/episodes/${episodeId}/metadata`),
       fetchJson(`/api/episodes/${episodeId}/trajectory`),
@@ -86,7 +88,8 @@ function App() {
       body: JSON.stringify(annotation),
     });
     setAnnotation(saved);
-    setMessage("Annotation saved");
+    setEpisodes((items) => items.map((item) => item.episode_id === episodeId ? { ...item, annotation: saved } : item));
+    setAnnotationMessage("Annotation saved");
   };
 
   const uploadSource = async () => {
@@ -233,15 +236,7 @@ function App() {
       h("div", { className: "form-card" }, h("strong", null, metadata.title), h("p", { className: "meta" }, `Frame ${frameIndex + 1}/${metadata.num_frames}`), currentReason ? h("p", { className: "reason" }, currentReason) : null),
       h("div", { className: "form-card" }, h("strong", null, "Gripper"), h(GripperChart, { trajectory, frameIndex })),
       h(window.UniVisConversionComponents.ConversionPanel, { episodeId, outputFormat, onMessage: setMessage }),
-      h("div", { className: "form-card" },
-        h("strong", null, "Annotation"),
-        h("textarea", { value: annotation.language_prompt, onChange: (event) => setAnnotation({ ...annotation, language_prompt: event.target.value }) }),
-        h("div", { className: "status-row" }, ["pending", "accepted", "rejected"].map((status) =>
-          h("button", { key: status, className: `ghost ${annotation.review_status === status ? "selected" : ""}`, onClick: () => setAnnotation({ ...annotation, review_status: status }) }, status),
-        )),
-        h("button", { className: "primary", onClick: saveAnnotation }, "Save"),
-        h("p", { className: "meta" }, message),
-      ),
+      h(window.UniVisAnnotationComponents.AnnotationPanel, { annotation, onAnnotation: setAnnotation, onSave: saveAnnotation, message: annotationMessage }),
     ),
   );
 }
