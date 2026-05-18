@@ -79,6 +79,7 @@ class EpisodeSession:
         self.active = ActiveSource(adapter_name=adapter_name, source=source)
         self._episode_cache.clear()
         self._metadata_cache.clear()
+        adapter.clear_caches()
         return self.source_payload()
 
     def validate_source(self, adapter_name: str, root_path: str | None = None) -> dict:

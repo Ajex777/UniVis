@@ -146,3 +146,12 @@ class RawEpisodeAdapter(ABC):
         """
 
         raise NotImplementedError(f"annotation update is not supported by {self.info().name}")
+
+    def clear_caches(self) -> None:
+        """Clear any internal caches (chunk, metadata, etc.).
+
+        Called by the session when the active source changes so adapters
+        can release cached data that belongs to the previous source.
+        """
+
+        pass

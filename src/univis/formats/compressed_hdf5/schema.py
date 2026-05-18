@@ -118,6 +118,29 @@ class CompressedHDF5Schema:
         return buffer.getvalue()
 
     @staticmethod
+    def encode_frame_preview(frame: np.ndarray, quality: int = 85) -> tuple[bytes, str]:
+        """Encode one BGR frame as browser-preview bytes.
+
+        Uses JPEG at the given quality level, which is ~10× faster to encode
+        than PNG and produces smaller payloads for HDF5 autoplay.
+
+        Inputs:
+            frame: BGR uint8 numpy array (H, W, 3).
+            quality: JPEG quality 1-100, default 85.
+        Output:
+            (data, media_type) ready for an HTTP response.
+        """
+
+        arr = np.asarray(frame)
+        if arr.dtype != np.uint8:
+            arr = np.clip(arr, 0, 255).astype(np.uint8)
+        if arr.ndim == 3 and arr.shape[2] == 3:
+            arr = arr[:, :, ::-1]
+        buffer = BytesIO()
+        Image.fromarray(arr).save(buffer, format="JPEG", quality=int(quality))
+        return buffer.getvalue(), "image/jpeg"
+
+    @staticmethod
     def require_file(root: h5py.File) -> None:
         """Validate the policy episode subset required by UniVis."""
 

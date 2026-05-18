@@ -44,6 +44,11 @@ class PikaRawEpisodeAdapter(RawEpisodeAdapter):
         self.synchronizer = PikaEpisodeSynchronizer(options)
         self._cache: dict[Path, PikaSyncResult] = {}
 
+    def clear_caches(self) -> None:
+        """Drop sync and chunk caches when switching source."""
+
+        self._cache.clear()
+
     @classmethod
     def info(cls) -> ComponentInfo:
         """Return adapter metadata for registry and UI display."""

@@ -58,3 +58,61 @@ HDF5 能正常工作是因为典型 HDF5 数据 FPS 较低（~12fps，间隔 83m
 | 图片体积 (PIKA) | ~414KB (PNG) | ~107KB (JPEG 原样) |
 | get_metadata 开销 | ~4ms/次（重复创建对象） | ~0（缓存命中） |
 | 测试 | 23 passed | 23 passed |
+
+## 2026-05-18 HDF5 压缩格式兼容性确认与播放优化
+
+### 格式兼容性
+UniVis `CompressedHDF5Schema` 与 embodichain `dexechain/data/data_engine/compressed_hdf5.py` 格式完全一致：
+
+| 特性 | embodichain | UniVis |
+|------|-------------|--------|
+| Schema | `observations/images/{cam}/` + `{cam}_index`/`_start` | 相同 |
+| BHW→BHWC | `to_bhwc()` 3D reshape | 相同 |
+| 深度量化 | `uint16_depth()` / `float32_depth()` | 相同 |
+| 图片 codec (多数 GPU) | `hf.x264(preset="veryfast", tune="fastdecode")` | `hf.x264(preset="veryfast", tune="fastdecode")` |
+| 图片 codec (RTX 3060) | `hf.h264_nvenc()` | `hf.h264_nvenc()` |
+| 遮罩 codec | `hf.x264(preset="veryslow", tune="ssim", crf=0)` | 相同 |
+| GPU 检测 | 支持 A800/3060/3090/4060/4090/5060/5090/Orin | 目前仅检测 RTX 3060 (`DexH5FFmpegCodec`) |
+| 索引表 | `np.array_split` chunk ID/start | 相同 |
+
+GPU 检测范围差异不影响解码——解码时 h5ffmpeg 自动识别压缩参数。
+
+### HDF5 播放卡顿问题
+
+#### 现象
+PIKA raw 卡顿修复后，HDF5 数据源连续播放时出现同样的画面卡顿。
+
+#### Profiling
+逐个测量帧服务管线各环节耗时：
+
+| 环节 | 耗时 | 占比 |
+|------|------|------|
+| 读取 index 数组 | ~0.5ms | 1% |
+| h5ffmpeg chunk 解压（5帧/chunk） | ~22ms | 22% |
+| BHW → BHWC 变换 | ~0.5ms | 1% |
+| PIL PNG 编码（640×480） | **~35ms** | **60%** |
+| BGR → RGB 复制 | ~1.3ms | 2% |
+| 其他开销 | ~10ms | 14% |
+| **总计** | **~85-94ms** | |
+
+瓶颈不在 h5ffmpeg 解压，而在 PIL PNG 编码，占单帧总耗时 60%。
+
+另外，每次帧请求都重复解压同一个 chunk（5 帧共 22ms），未利用连续播放的局部性。
+
+#### 优化方案
+
+1. **Chunk 缓存**（adapter.py）: `HDF5EpisodeAdapter` 增加 `_chunk_cache: dict[tuple, np.ndarray]`，解码后的 BHWC chunk 缓存复用。LRU 上限 12 entries（~280MB），连续播放同 chunk 时 h5ffmpeg 解压开销降至 0。
+
+2. **JPEG 预览**（schema.py）: 新增 `encode_frame_preview()`，用 JPEG q85 替代 PNG。JPEG 编码快 11 倍（3ms vs 35ms），体积小 6 倍（56KB vs 327KB）。浏览器 `<img>` 标签原生支持，无需前端改动。
+
+3. **缓存清理钩子**（base.py）: `RawEpisodeAdapter` 基类增加 `clear_caches()`，`EpisodeSession.set_source()` 时调用，确保切数据源时释放旧缓存。
+
+#### 效果对比
+
+| 指标 | 优化前 | 优化后 |
+|------|--------|--------|
+| 同 chunk 帧 | ~85-94ms | **~7ms** |
+| 跨 chunk 首帧 | ~85-94ms | **~30-39ms** |
+| 图片体积 | ~327KB (PNG) | **~56KB** (JPEG q85) |
+| Content-Type | image/png | image/jpeg |
+| 测试 | 23 passed | 26 passed |

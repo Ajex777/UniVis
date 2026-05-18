@@ -57,6 +57,15 @@
 - Added a PIKA raw -> HDF5 export regression test that loads raw data through `PikaRawEpisodeAdapter`, exports with real images, reloads through `HDF5EpisodeAdapter`, compares qpos, and checks exported image pixels against the synchronized raw source frame.
 - Decoupled frontend source selection from concrete adapter names. The registry now exposes `ComponentInfo.capabilities.source`; UI directory/file upload behavior uses those capability flags instead of hard-coding HDF5 or PIKA adapter ids.
 - Added registry tests for source capabilities and verified targeted Phase 02/03 coverage with `pytest` (`14 passed`), `node --check`, and `compileall`.
+
+## 2026-05-18
+- 对比确认 UniVis `CompressedHDF5Schema` 与 embodichain `compressed_hdf5.py` 格式一致：chunk 侧表 (`{camera}_index`/`_start`)、BHW→BHWC 变换、h5ffmpeg x264 压缩参数均匹配。两者 GPU 检测逻辑有差异（codec.py 仅检查 RTX 3060，embodichain 支持更多 GPU），但不影响解码。
+- 修复 HDF5 连续播放卡顿问题。Profiling 发现瓶颈不在 h5ffmpeg 解压（~22ms/chunk, 5帧），而在 PIL PNG 编码（~35ms/帧，占总耗时 60%）。优化方案：
+  1. `HDF5EpisodeAdapter` 增加 chunk 缓存（`_chunk_cache`），解码后的 BHWC chunk 缓存复用，消除同 chunk 内重复的 h5ffmpeg 解压
+  2. `CompressedHDF5Schema` 新增 `encode_frame_preview()`，用 JPEG q85 替代 PNG 编码，耗时从 35ms 降至 3ms（11x），体积从 327KB 降至 56KB（6x）
+  3. `RawEpisodeAdapter` 基类增加 `clear_caches()` 钩子，`EpisodeSession.set_source()` 时调用，确保切数据源时释放缓存
+  4. `PikaRawEpisodeAdapter` 同步实现 `clear_caches()`
+- 优化后 HDF5 帧服务时间从 ~85-94ms 降至：同 chunk 内 ~7ms，跨 chunk 首次 ~30-39ms。测试保持 26 passed。
 - Closed the first raw review -> HDF5 workflow loop: PIKA raw annotation now persists full `Annotation` state in `instructions.json` under `univis_annotation`, while preserving legacy prompt writeback.
 - Added `ConversionService`, `ConversionRouter`, `/api/conversions/episodes/{episode_id}`, and `/api/conversions/accepted`; conversion writes output artifacts plus `conversion_report.json`.
 - Added frontend conversion controls for `Export current` and `Export accepted`, using the selected registry output exporter rather than a hard-coded exporter id.

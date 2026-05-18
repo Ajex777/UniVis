@@ -4,6 +4,7 @@ from io import BytesIO
 from pathlib import Path
 
 import numpy as np
+import pytest
 from fastapi.testclient import TestClient
 from PIL import Image
 
@@ -147,10 +148,10 @@ def test_api_can_switch_to_hdf5_source(tmp_path: Path) -> None:
 
     frame = client.get(f"/api/episodes/{episode_id}/frame/cam_left_wrist/2")
     assert frame.status_code == 200
-    assert frame.headers["content-type"].startswith("image/png")
+    assert frame.headers["content-type"].startswith("image/")
     image = Image.open(BytesIO(frame.content)).convert("RGB")
     assert image.size == (8, 6)
-    assert image.getpixel((0, 0)) == (60, 42, 22)
+    assert image.getpixel((0, 0)) == pytest.approx((60, 42, 22), abs=5)
 
     updated = client.patch(
         f"/api/episodes/{episode_id}/annotation",
@@ -215,7 +216,7 @@ def test_api_can_upload_hdf5_directory_and_scan(tmp_path: Path) -> None:
 
     frame = client.get("/api/episodes/uploaded_script_episode/frame/cam_right_wrist/1")
     assert frame.status_code == 200
-    assert frame.headers["content-type"].startswith("image/png")
+    assert frame.headers["content-type"].startswith("image/")
 
 
 def test_upload_rejects_input_format_mismatch(tmp_path: Path) -> None:

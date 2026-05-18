@@ -25,5 +25,5 @@ def test_api_returns_frame_batches_for_prefetch(tmp_path: Path) -> None:
     assert payload["start"] == 1
     assert payload["count"] == 3
     assert [frame["index"] for frame in payload["frames"]] == [1, 2, 3]
-    assert payload["frames"][0]["media_type"] == "image/png"
-    assert payload["frames"][0]["data"].startswith("iVBOR")
+    assert payload["frames"][0]["media_type"].startswith("image/")
+    assert len(payload["frames"][0]["data"]) > 0

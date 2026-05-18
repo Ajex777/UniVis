@@ -27,9 +27,18 @@ try:
 except Exception:
     pass
 
-
 class HDF5EpisodeAdapter(RawEpisodeAdapter):
     """Load dexechain compressed HDF5 episodes into `PolicyEpisode`."""
+
+    def __init__(self) -> None:
+        """Initialize adapter with an in-memory chunk cache."""
+
+        self._chunk_cache: dict[tuple[str, str, int], np.ndarray] = {}
+
+    def clear_caches(self) -> None:
+        """Drop chunk cache when switching source."""
+
+        self._chunk_cache.clear()
 
     @classmethod
     def info(cls) -> ComponentInfo:
@@ -92,7 +101,7 @@ class HDF5EpisodeAdapter(RawEpisodeAdapter):
         frame_index: int,
         source: EpisodeSource | None = None,
     ) -> ImageFrame:
-        """Return one PNG frame decoded from compressed HDF5 chunks."""
+        """Return one preview frame decoded from compressed HDF5 chunks."""
 
         frames = self.get_image_frames(episode_id, camera_key, frame_index, 1, source)
         if not frames:
@@ -107,7 +116,12 @@ class HDF5EpisodeAdapter(RawEpisodeAdapter):
         count: int,
         source: EpisodeSource | None = None,
     ) -> list[ImageFrame]:
-        """Return a contiguous PNG frame batch from one HDF5 open."""
+        """Return JPEG preview frames with in-memory chunk caching.
+
+        Decoded BHWC chunks are cached so sequential playback through the
+        same chunk avoids repeated h5ffmpeg decompression. Preview frames
+        use JPEG for fast PIL encode and small payload.
+        """
 
         path = self.path_for_episode(episode_id, source)
         frames: list[ImageFrame] = []
@@ -117,8 +131,21 @@ class HDF5EpisodeAdapter(RawEpisodeAdapter):
             start = max(0, int(start_index))
             end = min(meta.num_frames, start + max(0, int(count)))
             for idx in range(start, end):
-                frame = CompressedHDF5Schema.read_image_frame(images, camera_key, idx)
-                frames.append(ImageFrame(CompressedHDF5Schema.encode_frame_png(frame), "image/png"))
+                chunk_id = CompressedHDF5Schema._chunk_id(images, camera_key, idx)
+                cache_key = (episode_id, camera_key, chunk_id)
+                if cache_key in self._chunk_cache:
+                    chunk = self._chunk_cache[cache_key]
+                else:
+                    chunk = CompressedHDF5Schema.to_bhwc(
+                        np.asarray(images[camera_key][str(chunk_id)][:])
+                    )
+                    self._chunk_cache[cache_key] = chunk
+                    if len(self._chunk_cache) > 12:
+                        self._chunk_cache.pop(next(iter(self._chunk_cache)))
+                local = int(idx) - CompressedHDF5Schema._chunk_start(images, camera_key, chunk_id)
+                frame_data = chunk[max(0, min(local, chunk.shape[0] - 1))]
+                data, media_type = CompressedHDF5Schema.encode_frame_preview(frame_data)
+                frames.append(ImageFrame(data=data, media_type=media_type))
         return frames
 
     def path_for_episode(self, episode_id: str, source: EpisodeSource | None) -> Path:
