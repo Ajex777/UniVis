@@ -6,11 +6,12 @@
 
 ## Scope
 
-- `HDF5EpisodeAdapter` 读取当前 compressed HDF5 schema，并输出 `PolicyEpisode`。
-- `HDF5EpisodeExporter` 从 `PolicyEpisode` 写出当前 HDF5 schema。
+- `HDF5EpisodeAdapter` 读取 dexechain-compatible compressed HDF5 schema，并输出 `PolicyEpisode`。
+- `HDF5EpisodeExporter` 从 `PolicyEpisode` 写出 dexechain-compatible compressed HDF5 schema。
 - 支持可变相机数，不只写死左右腕相机。
 - 支持读取和直接回写 HDF5 `language_prompt`。
-- 保持对当前 `h5ffmpeg` 压缩 HDF5 的兼容。
+- 使用内部 h5ffmpeg codec profile 写出真实 compressed HDF5 video chunks，不直接导入 dexechain。
+- HDF5 adapter/exporter 作为 `univis.formats.compressed_hdf5` subpackage 提供，主 app 通过 format component bundle 装载。
 - 建立小型 HDF5 fixture 用于导入/导出回归测试。
 
 ## Acceptance
@@ -27,7 +28,14 @@
 - Phase 02b：接入浏览器目录选择后的 HDF5 文件上传。前端上传文件内容和 relative path，server 在 staging workspace 重建目录结构后调用 `HDF5EpisodeAdapter` 扫描。当前已完成小型目录的一次性 multipart 上传。
 - Phase 02c：再接入当前 compressed HDF5 的图像帧解码/懒加载，避免 HDF5 filter 或 ffmpeg plugin 问题影响 trajectory/metadata 的基础验证。
 
-当前 Phase 02c 实现以 `pika_raw_to_compressed_hdf5.py` 生成结构为准：`observations/images` 下包含 `<camera>_index`、`<camera>_start` 和 `<camera>/<chunk_id>`，chunk 内图像为 BHW/BHWC。Web `/frame` API 按需读取单帧并返回 PNG。`h5ffmpeg` 已加入 uv runtime dependencies，`uv sync` 后可解码真实 ffmpeg-compressed HDF5。
+当前 Phase 02c 实现以 `pika_raw_to_compressed_hdf5.py` 生成结构为准：`observations/images` 下必须包含 `<camera>_index`、`<camera>_start` 和 `<camera>/<chunk_id>`，chunk 内图像为 BHW/BHWC。Web `/frame` API 按需读取单帧并返回 PNG。`h5ffmpeg` 已加入 uv runtime dependencies，`uv sync` 后可解码和写出真实 ffmpeg-compressed HDF5。
+
+当前 HDF5 代码组织为 `src/univis/formats/compressed_hdf5/`：
+
+- `schema.py`：dexechain HDF5 路径、chunk side-table、BHW/BHWC、depth quantization helpers。
+- `codec.py`：h5ffmpeg x264/NVENC codec profile，不导入 dexechain。
+- `adapter.py`：严格读取 compressed HDF5，不保留非 chunked-image fallback。
+- `exporter.py`：通过 `RawEpisodeAdapter` image provider 懒加载图像并写出 compressed chunks。
 
 当前主 viewer 播放路径使用稳定的单帧 `/frame` image request。50 帧 batch image API 和前端预取缓存先作为未来优化点保留设计方向；再次启用前需要验证全 episode 缓存淘汰、后半段窗口加载、拖动 seek 和多 camera 同步。
 
@@ -50,16 +58,16 @@
 - Upload staging test：上传一个或多个 HDF5 文件后，server 能在 staging 目录扫描出 episode。
 - Existing-data smoke test：选择一条现有 HDF5，验证 metadata、frame、trajectory API 正常。
 - Prompt writeback test：修改 `language_prompt` 后重新读取。
-- Adapter-backed export test：通过 raw adapter 提供真实图像，导出的 HDF5 可被 adapter 重新读回并显示同一帧像素。
+- Adapter-backed export test：通过 raw adapter 提供真实图像，导出的 HDF5 可被 adapter 重新读回并显示同一帧；由于 x264 是有损压缩，像素比较使用小容差。
 
 ## Current Notes
 
-- `HDF5EpisodeAdapter` 已支持读取 script-compatible chunked image frame。
+- `HDF5EpisodeAdapter` 已收敛为严格读取 dexechain-compatible chunked image frame，不再把非 compressed/chunked HDF5 当作 fallback。
 - `HDF5EpisodeAdapter` 已支持 source validation：合法输入为单个 `.hdf5/.h5` 文件，或顶层直接包含 `.hdf5/.h5` 文件的目录；暂不支持目录下再嵌套多个 HDF5 子目录。
 - 前端优先使用 `showDirectoryPicker()` 选择目录，只枚举顶层条目进行早期校验，避免 `webkitdirectory` 在误选根目录时递归扫描全树。前端同时支持选择单个 `.hdf5/.h5` 文件。
 - 浏览器不会提供用户机器上的绝对原始路径，因此 uploaded sources 保存的是用户选择时的显示名、上传时间、文件统计和 server-side staging path。
-- `PolicyEpisode` 当前仍主要承载帧同步后的轨迹/action/annotation metadata，图像通过 adapter 按需读取；导出真实图像时，`HDF5EpisodeExporter` 接收可选 `RawEpisodeAdapter`/`EpisodeSource` 作为 image provider。
-- `HDF5EpisodeExporter` 在未配置 image provider 时只写轨迹和 metadata，不写图像占位数据；配置 provider 时写出 script-compatible `observations/images/<camera>/<chunk_id>`、`<camera>_index` 和 `<camera>_start`。
+- `PolicyEpisode` 当前仍主要承载帧同步后的轨迹/action/annotation metadata，图像通过 adapter 按需读取；导出真实图像时，`HDF5EpisodeExporter` 接收 `RawEpisodeAdapter`/`EpisodeSource` 作为 image provider。
+- `HDF5EpisodeExporter` 对带 camera metadata 的 episode 要求配置 image provider；配置 provider 后写出 `observations/images/<camera>/<chunk_id>`、`<camera>_index` 和 `<camera>_start`，并通过 h5ffmpeg x264/NVENC profile 压缩。
 
 ## Out Of Scope
 

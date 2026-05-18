@@ -26,6 +26,14 @@ class ComponentInfo(BaseModel):
 
 
 @dataclass
+class ComponentBundle:
+    """Adapter/exporter instances contributed by a format subpackage."""
+
+    input_adapters: list[object] = field(default_factory=list)
+    output_exporters: list[object] = field(default_factory=list)
+
+
+@dataclass
 class ComponentRegistry:
     """In-memory registry for pluggable UniVis components.
 

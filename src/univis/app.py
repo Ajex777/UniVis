@@ -14,15 +14,14 @@ from univis.api.conversions import ConversionRouter
 from univis.api.routes import Phase00Router
 from univis.api.uploads import UploadRouter
 from univis.api.workspaces import WorkspaceRouter
-from univis.adapters.hdf5 import HDF5EpisodeAdapter
 from univis.adapters.pika_raw import PikaRawEpisodeAdapter
 from univis.core.components import ComponentRegistry
 from univis.core.conversions import ConversionService
 from univis.core.episode_session import EpisodeSession
 from univis.core.uploads import UploadManager
 from univis.core.workspaces import WorkspaceManager
-from univis.exporters.hdf5 import HDF5EpisodeExporter
 from univis.exporters.mock import MockEpisodeExporter
+from univis.formats import load_format_components
 from univis.reachability.mock import MockReachabilityBackend
 
 
@@ -54,14 +53,14 @@ class UniVisAppContext:
         package_dir = Path(__file__).resolve().parent
         self.static_dir = static_dir or package_dir / "web" / "static"
         self.uploads_root = uploads_root or package_dir.parents[1] / ".univis" / "uploads"
-        self.hdf5_adapter = HDF5EpisodeAdapter()
+        format_components = load_format_components()
         self.pika_adapter = PikaRawEpisodeAdapter()
-        self.adapters = [self.hdf5_adapter, self.pika_adapter]
+        self.adapters = format_components.input_adapters + [self.pika_adapter]
         self.session = EpisodeSession(
             adapters=self.adapters,
-            default_adapter_name=self.hdf5_adapter.info().name,
+            default_adapter_name=self.adapters[0].info().name,
         )
-        self.exporters = [HDF5EpisodeExporter(), MockEpisodeExporter()]
+        self.exporters = format_components.output_exporters + [MockEpisodeExporter()]
         self.registry = ComponentRegistry(
             input_adapters=self.adapters,
             output_exporters=self.exporters,

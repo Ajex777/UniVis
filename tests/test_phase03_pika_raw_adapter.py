@@ -140,4 +140,4 @@ def test_pika_raw_exports_hdf5_with_real_images(tmp_path: Path) -> None:
 
     assert result.success is True
     assert actual.size == expected.size
-    np.testing.assert_array_equal(np.asarray(actual), np.asarray(expected))
+    np.testing.assert_allclose(np.asarray(actual), np.asarray(expected), atol=12)

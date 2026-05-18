@@ -1,10 +1,13 @@
 """Shared HDF5 fixtures for tests."""
 
+from io import BytesIO
 from pathlib import Path
 
 import h5py
 import numpy as np
+from PIL import Image
 
+from univis.adapters.base import ImageFrame
 from univis.domain.policy_episode import (
     Annotation,
     ArmFrame,
@@ -13,6 +16,7 @@ from univis.domain.policy_episode import (
     PolicyEpisodeMetadata,
     PolicyFrame,
 )
+from univis.formats.compressed_hdf5.exporter import HDF5EpisodeExporter
 from univis.utils.hdf5_episode import frames_to_qpos, write_string_dataset
 
 
@@ -65,6 +69,43 @@ def script_compatible_images(num_frames: int) -> dict[str, np.ndarray]:
             data[frame_idx, :, :, 2] = 60 + cam_idx
         frames[cam_name] = data
     return frames
+
+
+class FixtureImageAdapter:
+    """Serve deterministic test images through the adapter image interface."""
+
+    def __init__(self, images: dict[str, np.ndarray]) -> None:
+        """Store BGR image arrays keyed by camera."""
+
+        self.images = images
+
+    def get_image_frame(
+        self,
+        episode_id: str,
+        camera_key: str,
+        frame_index: int,
+        source=None,
+    ) -> ImageFrame:
+        """Return one PNG frame from deterministic BGR fixture images."""
+
+        frame = self.images[camera_key][int(frame_index)][:, :, ::-1]
+        buffer = BytesIO()
+        Image.fromarray(frame).save(buffer, format="PNG")
+        return ImageFrame(buffer.getvalue(), "image/png")
+
+
+def export_compressed_hdf5(
+    episode: PolicyEpisode,
+    output_root: Path,
+    chunk_size: int = 2,
+):
+    """Export an episode with fixture-backed images in compressed HDF5 format."""
+
+    adapter = FixtureImageAdapter(script_compatible_images(episode.metadata.num_frames))
+    return HDF5EpisodeExporter(
+        image_adapter=adapter,
+        image_chunk_size=chunk_size,
+    ).export(episode, output_root)
 
 
 def write_script_hdf5(path: Path, num_frames: int = 4) -> None:

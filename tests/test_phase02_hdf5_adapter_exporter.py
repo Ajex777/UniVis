@@ -12,7 +12,7 @@ from univis.adapters.hdf5 import HDF5EpisodeAdapter
 from univis.app import create_app
 from univis.exporters.hdf5 import HDF5EpisodeExporter
 from univis.utils.hdf5_episode import frames_to_qpos
-from hdf5_fixtures import make_episode, write_script_hdf5
+from hdf5_fixtures import export_compressed_hdf5, make_episode, write_script_hdf5
 
 
 def test_policy_episode_hdf5_round_trip(tmp_path: Path) -> None:
@@ -25,7 +25,7 @@ def test_policy_episode_hdf5_round_trip(tmp_path: Path) -> None:
     """
 
     episode = make_episode("round-trip")
-    result = HDF5EpisodeExporter().export(episode, tmp_path)
+    result = export_compressed_hdf5(episode, tmp_path)
     adapter = HDF5EpisodeAdapter()
     loaded = adapter.load_episode(
         episode.metadata.episode_id,
@@ -53,11 +53,10 @@ def test_hdf5_adapter_lists_directory_naturally(tmp_path: Path) -> None:
     """
 
     base_episode = make_episode()
-    exporter = HDF5EpisodeExporter()
     for episode_id in ("episode10", "episode2"):
         episode = base_episode.model_copy(deep=True)
         episode.metadata.episode_id = episode_id
-        exporter.export(episode, tmp_path)
+        export_compressed_hdf5(episode, tmp_path)
 
     items = HDF5EpisodeAdapter().list_metadata(EpisodeSource(root_path=tmp_path))
     assert [item.episode_id for item in items] == ["episode2", "episode10"]
@@ -110,7 +109,7 @@ def test_hdf5_language_prompt_writeback(tmp_path: Path) -> None:
     """
 
     episode = make_episode("prompt-test")
-    result = HDF5EpisodeExporter().export(episode, tmp_path)
+    result = export_compressed_hdf5(episode, tmp_path)
     path = Path(result.output_path)
 
     adapter = HDF5EpisodeAdapter()

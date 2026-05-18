@@ -66,3 +66,11 @@
 - Scoped annotation save feedback to the currently selected episode by splitting annotation UI into `annotation_components.js`; switching episodes now clears the local "Annotation saved" message.
 - Changed episode-list status colors/text to use the adapter-agnostic `PolicyEpisodeMetadata.annotation.review_status` contract. Adapters without native review metadata can still return the default `Annotation(review_status="pending")`, while adapters that support persistence save through their own `update_annotation()` implementation.
 - Remaining next step: perform stricter legacy converter regression for PIKA raw synchronization, add review-status list filtering, and add conversion overwrite/skip controls plus richer progress display.
+
+## 2026-05-17
+- Refactored HDF5 support into the `univis.formats.compressed_hdf5` subpackage. The package now owns its schema helpers, h5ffmpeg codec profile, adapter, exporter, and component bundle entrypoint.
+- Added `univis.formats.load_format_components()` so the app can load format packages without hard-coding adapter/exporter modules in the application factory. Old `univis.adapters.hdf5` and `univis.exporters.hdf5` modules are now thin compatibility imports only.
+- Tightened HDF5 support around the dexechain compressed HDF5 contract: required root datasets are `observations/qpos`, `action`, `chunks`, `language_prompt`, plus strict chunked image groups under `observations/images/<camera>/<chunk_id>` with `<camera>_index` and `<camera>_start`.
+- Changed HDF5 export to write actual dexechain-style h5ffmpeg video chunks through an internal `DexH5FFmpegCodec` instead of gzip image chunks. The codec mirrors dexechain's x264 defaults and keeps RTX 3060 NVENC selection as a codec strategy rather than a superclass dependency.
+- Removed core-session coupling to the HDF5 class by replacing `isinstance(HDF5EpisodeAdapter)` conversion status logic with adapter capability metadata.
+- Updated HDF5 tests to reflect compressed video behavior: exporter tests now use adapter-backed fixture images, and image comparisons allow small x264 loss instead of expecting byte-identical pixels.

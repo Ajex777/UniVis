@@ -10,7 +10,6 @@ from univis.adapters.base import (
     ImageFrame,
     RawEpisodeAdapter,
 )
-from univis.adapters.hdf5 import HDF5EpisodeAdapter
 from univis.domain.policy_episode import Annotation, PolicyEpisode, PolicyEpisodeMetadata
 
 
@@ -198,6 +197,10 @@ class EpisodeSession:
     ) -> dict[str, object]:
         """Return UI conversion status for an episode."""
 
-        if isinstance(adapter, HDF5EpisodeAdapter):
-            return {"status": "converted", "progress": 1.0}
+        conversion = adapter.info().capabilities.get("conversion", {})
+        if isinstance(conversion, dict) and "default_status" in conversion:
+            return {
+                "status": conversion.get("default_status", "pending"),
+                "progress": conversion.get("default_progress", 0.0),
+            }
         return {"status": "pending", "progress": 0.0}
