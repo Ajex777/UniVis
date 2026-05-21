@@ -1,0 +1,1 @@
+uv run univis --workspace raw=/home/dex/app/data --workspace data=/home/dex/app/pika/data --workspace output=/home/dex/app/UniVis/.univis/exports
