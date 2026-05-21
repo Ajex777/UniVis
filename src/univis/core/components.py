@@ -31,6 +31,7 @@ class ComponentBundle:
 
     input_adapters: list[object] = field(default_factory=list)
     output_exporters: list[object] = field(default_factory=list)
+    preprocessors: list[object] = field(default_factory=list)
 
 
 @dataclass
@@ -48,6 +49,7 @@ class ComponentRegistry:
     input_adapters: list[object] = field(default_factory=list)
     output_exporters: list[object] = field(default_factory=list)
     reachability_backends: list[object] = field(default_factory=list)
+    preprocessors: list[object] = field(default_factory=list)
 
     def api_payload(self) -> dict[str, list[dict[str, object]]]:
         """Return registry contents for API consumers.
@@ -62,6 +64,7 @@ class ComponentRegistry:
             "input_adapters": self._dump(self.input_adapters),
             "output_exporters": self._dump(self.output_exporters),
             "reachability_backends": self._dump(self.reachability_backends),
+            "preprocessors": self._dump(self.preprocessors),
         }
 
     def _dump(self, components: list[object]) -> list[dict[str, object]]:

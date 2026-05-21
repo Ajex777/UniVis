@@ -3,12 +3,33 @@
   const { useEffect, useState } = React;
   const ConversionIO = window.UniVisConversionIO;
 
+  function PreprocessorCheckboxes({ items, active, onChange }) {
+    if (!items?.length) return null;
+    return h("div", { className: "form-card" },
+      h("strong", null, "Preprocessing"),
+      items.map((pp) =>
+        h("label", { key: pp.name, className: "checkbox-label" },
+          h("input", {
+            type: "checkbox",
+            checked: active.has(pp.name),
+            onChange: () => {
+              const next = new Set(active);
+              if (next.has(pp.name)) next.delete(pp.name); else next.add(pp.name);
+              onChange(next);
+            },
+          }),
+          ` ${pp.label}`,
+        ),
+      ),
+    );
+  }
+
   /**
    * Render active-source conversion controls.
    * Input: selected episode id, selected exporter name, and message handler.
    * Output: React panel for single and accepted-only batch conversion.
    */
-  function ConversionPanel({ episodeId, outputFormat, onMessage }) {
+  function ConversionPanel({ episodeId, outputFormat, onMessage, preprocessors, activePreprocessors, onActivePreprocessors }) {
     const [outputRoot, setOutputRoot] = useState("");
     const [busy, setBusy] = useState(false);
     const [jobs, setJobs] = useState([]);
@@ -24,8 +45,8 @@
       setBusy(true);
       try {
         const payload = scope === "accepted"
-          ? await ConversionIO.convertAccepted(outputFormat, outputRoot)
-          : await ConversionIO.convertEpisode(episodeId, outputFormat, outputRoot);
+          ? await ConversionIO.convertAccepted(outputFormat, outputRoot, [...activePreprocessors])
+          : await ConversionIO.convertEpisode(episodeId, outputFormat, outputRoot, [...activePreprocessors]);
         setJobs((items) => [payload, ...items.filter((item) => item.job_id !== payload.job_id)]);
         onMessage(`Export job started: ${payload.job_id.slice(0, 8)}`);
       } catch (error) {
@@ -44,6 +65,7 @@
     }
 
     return h(React.Fragment, null,
+      h(PreprocessorCheckboxes, { items: preprocessors, active: activePreprocessors, onChange: onActivePreprocessors }),
       h("div", { className: "form-card" },
         h("strong", null, "Conversion"),
         h("input", {

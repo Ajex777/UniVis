@@ -6,11 +6,11 @@
    * Input: episode id, exporter name, and optional output root.
    * Output: Conversion report payload.
    */
-  function convertEpisode(episodeId, exporterName, outputRoot) {
+  function convertEpisode(episodeId, exporterName, outputRoot, preprocessors) {
     return fetchJson(`/api/conversions/episodes/${episodeId}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ exporter_name: exporterName, output_root: outputRoot || "" }),
+      body: JSON.stringify({ exporter_name: exporterName, output_root: outputRoot || "", preprocessors: preprocessors || [] }),
     });
   }
 
@@ -19,11 +19,11 @@
    * Input: exporter name and optional output root.
    * Output: Conversion report payload.
    */
-  function convertAccepted(exporterName, outputRoot) {
+  function convertAccepted(exporterName, outputRoot, preprocessors) {
     return fetchJson("/api/conversions/accepted", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ exporter_name: exporterName, output_root: outputRoot || "" }),
+      body: JSON.stringify({ exporter_name: exporterName, output_root: outputRoot || "", preprocessors: preprocessors || [] }),
     });
   }
 

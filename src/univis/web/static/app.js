@@ -29,6 +29,7 @@ function App() {
   const [sourceRevision, setSourceRevision] = useState(0);
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [batchMessage, setBatchMessage] = useState("");
+  const [activePreprocessors, setActivePreprocessors] = useState(new Set());
   useTrajectoryPlot("trajectory-plot", trajectory, frameIndex);
 
   useEffect(() => {
@@ -264,7 +265,7 @@ function App() {
     h("aside", { className: "inspector" },
       h("div", { className: "form-card" }, h("strong", null, metadata.title), h("p", { className: "meta" }, `Frame ${frameIndex + 1}/${metadata.num_frames}`), currentReason ? h("p", { className: "reason" }, currentReason) : null),
       h("div", { className: "form-card" }, h("strong", null, "Gripper"), h(GripperChart, { trajectory, frameIndex })),
-      h(window.UniVisConversionComponents.ConversionPanel, { episodeId, outputFormat, onMessage: setMessage }),
+      h(window.UniVisConversionComponents.ConversionPanel, { episodeId, outputFormat, onMessage: setMessage, preprocessors: registry?.preprocessors || [], activePreprocessors, onActivePreprocessors: setActivePreprocessors }),
       h(window.UniVisAnnotationComponents.AnnotationPanel, {
         annotation, onAnnotation: setAnnotation, onSave: saveAnnotation,
         message: annotationMessage, batchCount: selectedIds.size,

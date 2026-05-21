@@ -16,12 +16,14 @@ class ConversionRequest(BaseModel):
     Inputs:
         exporter_name: Registered exporter component name.
         output_root: Optional server-local output directory.
+        preprocessors: Optional list of preprocessor names to apply.
     Output:
         Validated conversion request.
     """
 
     exporter_name: str
     output_root: str = ""
+    preprocessors: list[str] = []
 
 
 class ConversionRouter:
@@ -54,6 +56,7 @@ class ConversionRouter:
                 episode_id,
                 request.exporter_name,
                 self._output_root(request),
+                preprocessor_names=request.preprocessors,
             )
         except Exception as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -66,6 +69,7 @@ class ConversionRouter:
             job = self.service.start_accepted(
                 request.exporter_name,
                 self._output_root(request),
+                preprocessor_names=request.preprocessors,
             )
         except Exception as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc

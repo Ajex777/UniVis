@@ -12,6 +12,7 @@ from pydantic import BaseModel, Field
 
 from univis.adapters.base import EpisodeSource, RawEpisodeAdapter
 from univis.core.episode_session import EpisodeSession
+from univis.domain.policy_episode import PolicyEpisode, PolicyEpisodeMetadata
 from univis.exporters.base import EpisodeExporter, ExportResult
 from univis.utils.json_io import write_json
 
@@ -55,6 +56,23 @@ class ConversionJob(BaseModel):
     updated_at: str
 
 
+class PreprocessorChain:
+    """Applies active preprocessors to episode data and adapter."""
+
+    def __init__(self, preprocessors: dict[str, object], active_names: list[str]) -> None:
+        self._steps = [preprocessors[n] for n in active_names if n in preprocessors]
+
+    def apply_data(self, episode: PolicyEpisode) -> PolicyEpisode:
+        for pp in self._steps:
+            episode = pp.preprocess_episode(episode)
+        return episode
+
+    def apply_adapter(self, adapter, metadata: PolicyEpisodeMetadata):
+        for pp in self._steps:
+            adapter = pp.preprocess_adapter(adapter, metadata)
+        return adapter
+
+
 class ConversionService:
     """Run active-source conversions through registered exporters."""
 
@@ -63,12 +81,14 @@ class ConversionService:
         session: EpisodeSession,
         exporters: list[EpisodeExporter],
         default_output_root: Path,
+        preprocessors: dict[str, object] | None = None,
     ) -> None:
         """Initialize conversion dependencies."""
 
         self.session = session
         self.exporters = {exporter.info().name: exporter for exporter in exporters}
         self.default_output_root = default_output_root
+        self.preprocessors = preprocessors or {}
         self._jobs: dict[str, ConversionJob] = {}
         self._lock = Lock()
 
@@ -77,15 +97,17 @@ class ConversionService:
         episode_id: str,
         exporter_name: str,
         output_root: Path | None = None,
+        preprocessor_names: list[str] | None = None,
     ) -> ConversionJob:
         """Start one active episode conversion in the background."""
 
-        return self._start([episode_id], "current", exporter_name, output_root)
+        return self._start([episode_id], "current", exporter_name, output_root, preprocessor_names or [])
 
     def start_accepted(
         self,
         exporter_name: str,
         output_root: Path | None = None,
+        preprocessor_names: list[str] | None = None,
     ) -> ConversionJob:
         """Start accepted-only active source conversion in the background."""
 
@@ -94,7 +116,7 @@ class ConversionService:
             for item in self.session.list_episodes()
             if item.get("annotation", {}).get("review_status") == "accepted"
         ]
-        return self._start(ids, "accepted", exporter_name, output_root)
+        return self._start(ids, "accepted", exporter_name, output_root, preprocessor_names or [])
 
     def list_jobs(self) -> list[ConversionJob]:
         """Return recent conversion jobs, newest first."""
@@ -116,6 +138,7 @@ class ConversionService:
         scope: str,
         exporter_name: str,
         output_root: Path | None,
+        preprocessor_names: list[str],
     ) -> ConversionJob:
         target_root = Path(output_root or self.default_output_root).expanduser().resolve()
         exporter = self._exporter(exporter_name)
@@ -136,7 +159,7 @@ class ConversionService:
             self._jobs[job.job_id] = job
         Thread(
             target=self._run_job,
-            args=(job.job_id, episode_ids, exporter, adapter, source, target_root),
+            args=(job.job_id, episode_ids, exporter, adapter, source, target_root, preprocessor_names),
             daemon=True,
         ).start()
         return job
@@ -149,6 +172,7 @@ class ConversionService:
         adapter: RawEpisodeAdapter,
         source: EpisodeSource | None,
         output_root: Path,
+        preprocessor_names: list[str],
     ) -> None:
         output_root.mkdir(parents=True, exist_ok=True)
         self._update_job(job_id, status="running", message="running")
@@ -156,7 +180,7 @@ class ConversionService:
             self._finish_job(job_id, exporter, output_root, adapter, source)
             return
         for episode_id in episode_ids:
-            item = self._convert_one(episode_id, exporter, adapter, source, output_root)
+            item = self._convert_one(episode_id, exporter, adapter, source, output_root, preprocessor_names)
             with self._lock:
                 job = self._jobs[job_id]
                 job.items.append(item)
@@ -175,10 +199,14 @@ class ConversionService:
         adapter: RawEpisodeAdapter,
         source: EpisodeSource | None,
         output_root: Path,
+        preprocessor_names: list[str],
     ) -> ConversionItem:
         try:
             episode = adapter.load_episode(episode_id, source)
-            bound = self._with_images(exporter, adapter, source)
+            chain = PreprocessorChain(self.preprocessors, preprocessor_names)
+            episode = chain.apply_data(episode)
+            wrapped = chain.apply_adapter(adapter, episode.metadata)
+            bound = self._with_images(exporter, wrapped, source)
             return self._item_from_result(bound.export(episode, output_root))
         except Exception as exc:
             return ConversionItem(episode_id=episode_id, success=False, message=str(exc))

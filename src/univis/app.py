@@ -22,6 +22,7 @@ from univis.core.uploads import UploadManager
 from univis.core.workspaces import WorkspaceManager
 from univis.exporters.mock import MockEpisodeExporter
 from univis.formats import load_format_components
+from univis.preprocessors import load_preprocessors
 from univis.reachability.mock import MockReachabilityBackend
 
 
@@ -61,10 +62,13 @@ class UniVisAppContext:
             default_adapter_name=self.adapters[0].info().name,
         )
         self.exporters = format_components.output_exporters + [MockEpisodeExporter()]
+        self.preprocessors = load_preprocessors()
+        self.preprocessor_map = {pp.info().name: pp for pp in self.preprocessors}
         self.registry = ComponentRegistry(
             input_adapters=self.adapters,
             output_exporters=self.exporters,
             reachability_backends=[MockReachabilityBackend()],
+            preprocessors=self.preprocessors,
         )
         self.upload_manager = UploadManager(self.uploads_root)
         self.workspace_manager = WorkspaceManager(workspaces)
@@ -72,6 +76,7 @@ class UniVisAppContext:
             self.session,
             self.exporters,
             package_dir.parents[1] / ".univis" / "exports",
+            preprocessors=self.preprocessor_map,
         )
 
     def create_app(self) -> FastAPI:
