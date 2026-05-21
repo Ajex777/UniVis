@@ -41,16 +41,24 @@
   }
 
   /**
-   * Render a review-state episode card.
-   * Input: episode item, active id, and click handler.
+   * Render a review-state episode card with optional selection checkbox.
+   * Input: episode item, active id, click handler, and selection props.
    * Output: Button element with review status color and text.
    */
-  function EpisodeButton({ item, active, onClick }) {
+  function EpisodeButton({ item, active, onClick, selectable, checked, onToggleSelect }) {
     const reviewStatus = item.annotation?.review_status || "pending";
     return h("button", {
       className: `episode-button ${active ? "active" : ""} review-${reviewStatus}`,
       onClick,
     },
+      selectable ? h("input", {
+        type: "checkbox",
+        className: "episode-check",
+        checked: !!checked,
+        onChange: onToggleSelect,
+        onClick: (event) => event.stopPropagation(),
+        title: "Select for batch review",
+      }) : null,
       h("strong", null, item.title),
       h("p", { className: "meta" },
         `${item.num_frames} frames · ${item.cameras.length} cameras · ${reviewStatus}`,

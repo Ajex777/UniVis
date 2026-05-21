@@ -1,7 +1,7 @@
 (function () {
   const h = React.createElement;
   const { useEffect, useMemo, useState } = React;
-  const { fetchJson } = window.UniVisApi;
+  const { fetchJson, batchAnnotation } = window.UniVisApi;
   const SourceIO = window.UniVisSourceIO;
   const { CameraCard, EpisodeButton, SourceControls, defaultSlots } = window.UniVisComponents;
   const { GripperChart, useTrajectoryPlot } = window.UniVisPlots;
@@ -17,7 +17,6 @@ function App() {
   const [annotation, setAnnotation] = useState(null);
   const [annotationMessage, setAnnotationMessage] = useState("");
   const [message, setMessage] = useState("");
-  const [collapsed, setCollapsed] = useState(false);
   const [playSpeed, setPlaySpeed] = useState(0);
   const [inputFormat, setInputFormat] = useState("");
   const [outputFormat, setOutputFormat] = useState("");
@@ -28,6 +27,8 @@ function App() {
   const [selectedUploadId, setSelectedUploadId] = useState("");
   const [sourceMode, setSourceMode] = useState("Mode: no source selected");
   const [sourceRevision, setSourceRevision] = useState(0);
+  const [selectedIds, setSelectedIds] = useState(new Set());
+  const [batchMessage, setBatchMessage] = useState("");
   useTrajectoryPlot("trajectory-plot", trajectory, frameIndex);
 
   useEffect(() => {
@@ -81,6 +82,26 @@ function App() {
 
   const selectedInputInfo = useMemo(() => registry?.input_adapters?.find((item) => item.name === inputFormat) || null, [registry, inputFormat]);
 
+  const toggleEpisodeSelection = (id) => setSelectedIds((prev) => {
+    const next = new Set(prev);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    return next;
+  });
+
+  const batchApplyAnnotation = async () => {
+    if (selectedIds.size === 0) return;
+    try {
+      const result = await batchAnnotation([...selectedIds], annotation);
+      setBatchMessage(`Applied to ${result.ok}/${result.total} episodes`);
+      const updated = {};
+      for (const [id, entry] of Object.entries(result.results))
+        if (entry.status === "ok") updated[id] = entry.annotation;
+      setEpisodes((items) => items.map((item) =>
+        updated[item.episode_id] ? { ...item, annotation: updated[item.episode_id] } : item));
+      if (updated[episodeId]) setAnnotation(updated[episodeId]);
+    } catch (error) { setBatchMessage(error.message); }
+  };
+
   const saveAnnotation = async () => {
     const saved = await fetchJson(`/api/episodes/${episodeId}/annotation`, {
       method: "PATCH",
@@ -105,6 +126,7 @@ function App() {
       setMessage(error.message);
     }
   };
+
   const pickDirectory = async () => {
     try {
       applySelection(await SourceIO.pickDirectory(selectedInputInfo));
@@ -145,6 +167,7 @@ function App() {
     const items = payload.episodes || [];
     setEpisodes(items);
     setEpisodeId(items[0]?.episode_id || "");
+    setSelectedIds(new Set());
     setSourceMessage("");
     setSourceMode(modeText || payload.mode || "Mode: source selected");
     setSourceRevision((value) => value + 1);
@@ -201,14 +224,20 @@ function App() {
       sourceControls,
       h("div", { className: "list-header" },
         h("strong", null, "Episodes"),
-        h("button", { className: "link-button", onClick: () => setCollapsed(!collapsed) }, collapsed ? "Expand" : "Collapse"),
+        h("div", { className: "source-row" },
+          h("button", { className: "link-button", onClick: () => setSelectedIds(new Set(episodes.map((e) => e.episode_id))) }, "All"),
+          h("button", { className: "link-button", onClick: () => setSelectedIds(new Set()) }, "None"),
+        ),
       ),
-      collapsed ? null : h("div", { className: "episode-list" }, episodes.map((item) =>
+      h("div", { className: "episode-list" }, episodes.map((item) =>
         h(EpisodeButton, {
           key: item.episode_id,
           item,
           active: item.episode_id === episodeId,
           onClick: () => setEpisodeId(item.episode_id),
+          selectable: true,
+          checked: selectedIds.has(item.episode_id),
+          onToggleSelect: () => toggleEpisodeSelection(item.episode_id),
         }),
       )),
     ),
@@ -236,7 +265,11 @@ function App() {
       h("div", { className: "form-card" }, h("strong", null, metadata.title), h("p", { className: "meta" }, `Frame ${frameIndex + 1}/${metadata.num_frames}`), currentReason ? h("p", { className: "reason" }, currentReason) : null),
       h("div", { className: "form-card" }, h("strong", null, "Gripper"), h(GripperChart, { trajectory, frameIndex })),
       h(window.UniVisConversionComponents.ConversionPanel, { episodeId, outputFormat, onMessage: setMessage }),
-      h(window.UniVisAnnotationComponents.AnnotationPanel, { annotation, onAnnotation: setAnnotation, onSave: saveAnnotation, message: annotationMessage }),
+      h(window.UniVisAnnotationComponents.AnnotationPanel, {
+        annotation, onAnnotation: setAnnotation, onSave: saveAnnotation,
+        message: annotationMessage, batchCount: selectedIds.size,
+        onBatchApply: batchApplyAnnotation, batchMessage,
+      }),
     ),
   );
 }

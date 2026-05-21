@@ -2,11 +2,11 @@
   const h = React.createElement;
 
   /**
-   * Render episode annotation editing controls.
-   * Input: annotation payload, update callback, save callback, and local message.
-   * Output: React form for prompt and review status editing.
+   * Render episode annotation editing controls with batch apply support.
+   * Input: annotation, callbacks, message, and batch review props.
+   * Output: React form for prompt, review status, single save, and batch apply.
    */
-  function AnnotationPanel({ annotation, onAnnotation, onSave, message }) {
+  function AnnotationPanel({ annotation, onAnnotation, onSave, message, batchCount, onBatchApply, batchMessage }) {
     return h("div", { className: "form-card" },
       h("strong", null, "Annotation"),
       h("textarea", {
@@ -21,7 +21,14 @@
         }, status),
       )),
       h("button", { className: "primary", onClick: onSave }, "Save"),
+      h("button", {
+        className: "primary",
+        onClick: onBatchApply,
+        disabled: !batchCount,
+        style: { marginTop: 6, opacity: batchCount ? 1 : 0.5 },
+      }, batchCount ? `Apply to selected (${batchCount})` : "Apply to selected"),
       message ? h("p", { className: "meta" }, message) : null,
+      batchMessage ? h("p", { className: "meta", style: { color: "var(--accent)" } }, batchMessage) : null,
     );
   }
 

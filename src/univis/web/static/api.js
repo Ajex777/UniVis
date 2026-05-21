@@ -23,5 +23,18 @@
     return `/api/episodes/${episodeId}/frame/${cameraKey}/${frameIndex}`;
   }
 
-  window.UniVisApi = { fetchJson, frameUrl };
+  /**
+   * Apply one annotation to multiple episodes.
+   * Input: list of episode IDs and an annotation payload.
+   * Output: batch result containing per-episode status.
+   */
+  async function batchAnnotation(episodeIds, annotation) {
+    return fetchJson("/api/episodes/batch/annotation", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ episode_ids: episodeIds, annotation }),
+    });
+  }
+
+  window.UniVisApi = { fetchJson, frameUrl, batchAnnotation };
 })();

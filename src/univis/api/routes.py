@@ -19,6 +19,13 @@ class SourceSelectionRequest(BaseModel):
     root_path: str = ""
 
 
+class BatchAnnotationRequest(BaseModel):
+    """Request payload for applying an annotation to multiple episodes."""
+
+    episode_ids: list[str]
+    annotation: Annotation
+
+
 class Phase00Router:
     """Route container for PolicyEpisode APIs."""
 
@@ -41,6 +48,7 @@ class Phase00Router:
         self.router.add_api_route("/source", self.set_source, methods=["POST"])
         self.router.add_api_route("/episodes/{episode_id}/metadata", self.get_metadata, methods=["GET"])
         self.router.add_api_route("/episodes/{episode_id}/trajectory", self.get_trajectory, methods=["GET"])
+        self.router.add_api_route("/episodes/batch/annotation", self.batch_update_annotation, methods=["PATCH"])
         self.router.add_api_route("/episodes/{episode_id}/annotation", self.update_annotation, methods=["PATCH"])
         self.router.add_api_route(
             "/episodes/{episode_id}/frame/{camera_key}/{frame_index}",
@@ -128,6 +136,20 @@ class Phase00Router:
         except Exception as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
         return saved.model_dump()
+
+    def batch_update_annotation(self, request: BatchAnnotationRequest) -> dict:
+        """Apply one annotation payload to multiple episodes at once."""
+
+        results: dict[str, dict] = {}
+        ok = 0
+        for episode_id in request.episode_ids:
+            try:
+                saved = self.session.update_annotation(episode_id, request.annotation)
+                results[episode_id] = {"status": "ok", "annotation": saved.model_dump()}
+                ok += 1
+            except Exception as exc:
+                results[episode_id] = {"status": "error", "detail": str(exc)}
+        return {"ok": ok, "total": len(request.episode_ids), "results": results}
 
     def get_camera_frame(
         self,
