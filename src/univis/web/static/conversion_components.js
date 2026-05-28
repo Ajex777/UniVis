@@ -30,11 +30,13 @@
    * Output: React panel for single and accepted-only batch conversion.
    */
   function ConversionPanel({ episodeId, outputFormat, onMessage, preprocessors, activePreprocessors, onActivePreprocessors }) {
-    const [outputRoot, setOutputRoot] = useState("");
+    const [outputConfig, setOutputConfig] = useState(null);
+    const [outputSubpath, setOutputSubpath] = useState("");
     const [busy, setBusy] = useState(false);
     const [jobs, setJobs] = useState([]);
 
     useEffect(() => {
+      ConversionIO.getConfig().then(setOutputConfig).catch((_error) => setOutputConfig(null));
       refreshJobs();
       const timer = window.setInterval(refreshJobs, 1000);
       return () => window.clearInterval(timer);
@@ -45,8 +47,8 @@
       setBusy(true);
       try {
         const payload = scope === "accepted"
-          ? await ConversionIO.convertAccepted(outputFormat, outputRoot, [...activePreprocessors])
-          : await ConversionIO.convertEpisode(episodeId, outputFormat, outputRoot, [...activePreprocessors]);
+          ? await ConversionIO.convertAccepted(outputFormat, outputSubpath, [...activePreprocessors])
+          : await ConversionIO.convertEpisode(episodeId, outputFormat, outputSubpath, [...activePreprocessors]);
         setJobs((items) => [payload, ...items.filter((item) => item.job_id !== payload.job_id)]);
         onMessage(`Export job started: ${payload.job_id.slice(0, 8)}`);
       } catch (error) {
@@ -68,10 +70,11 @@
       h(PreprocessorCheckboxes, { items: preprocessors, active: activePreprocessors, onChange: onActivePreprocessors }),
       h("div", { className: "form-card" },
         h("strong", null, "Conversion"),
+        h("p", { className: "meta" }, `Output root: ${outputConfig?.root || "loading..."}`),
         h("input", {
-          value: outputRoot,
-          placeholder: "Output directory (default .univis/exports)",
-          onChange: (event) => setOutputRoot(event.target.value),
+          value: outputSubpath,
+          placeholder: "Relative output subpath, e.g. sort_book_0509/pos1",
+          onChange: (event) => setOutputSubpath(event.target.value),
         }),
         h("div", { className: "status-row" },
           h("button", {

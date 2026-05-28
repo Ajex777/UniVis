@@ -40,6 +40,7 @@ class UniVisAppContext:
         static_dir: Path | None = None,
         uploads_root: Path | None = None,
         workspaces: dict[str, Path | str] | None = None,
+        output_root: Path | str | None = None,
     ) -> None:
         """Initialize dependency context.
 
@@ -47,6 +48,7 @@ class UniVisAppContext:
             static_dir: Optional override for static frontend files.
             uploads_root: Optional override for dataset upload staging.
             workspaces: Named server-local roots available to the frontend.
+            output_root: Server-local root used for exported datasets.
         Output:
             Context with repository and static file path.
         """
@@ -75,7 +77,7 @@ class UniVisAppContext:
         self.conversion_service = ConversionService(
             self.session,
             self.exporters,
-            package_dir.parents[1] / ".univis" / "exports",
+            Path(output_root).expanduser() if output_root else package_dir.parents[1] / ".univis" / "exports",
             preprocessors=self.preprocessor_map,
         )
 
@@ -113,6 +115,7 @@ class UniVisAppContext:
 def create_app(
     uploads_root: Path | None = None,
     workspaces: dict[str, Path | str] | None = None,
+    output_root: Path | str | None = None,
 ) -> FastAPI:
     """Build a UniVis FastAPI app with default context.
 
@@ -122,7 +125,11 @@ def create_app(
         Configured FastAPI application.
     """
 
-    return UniVisAppContext(uploads_root=uploads_root, workspaces=workspaces).create_app()
+    return UniVisAppContext(
+        uploads_root=uploads_root,
+        workspaces=workspaces,
+        output_root=output_root,
+    ).create_app()
 
 
 app = create_app()
@@ -148,8 +155,17 @@ def main() -> None:
         metavar="NAME=PATH",
         help="Register a server-local data workspace. Can be repeated.",
     )
+    parser.add_argument(
+        "--output",
+        default="",
+        metavar="PATH",
+        help="Server-local export root. UI output paths are relative to this directory.",
+    )
     args = parser.parse_args()
-    runtime_app = create_app(workspaces=parse_workspace_args(args.workspace))
+    runtime_app = create_app(
+        workspaces=parse_workspace_args(args.workspace),
+        output_root=parse_output_arg(args.output),
+    )
     uvicorn.run(
         runtime_app,
         host=str(args.host),
@@ -174,6 +190,13 @@ def parse_workspace_args(specs: list[str]) -> dict[str, Path]:
         name, raw_path = spec.split("=", 1)
         workspaces[name.strip()] = Path(raw_path.strip()).expanduser()
     return workspaces
+
+
+def parse_output_arg(spec: str | None) -> Path | None:
+    """Parse the optional `--output PATH` CLI value."""
+
+    clean = (spec or "").strip()
+    return Path(clean).expanduser() if clean else None
 
 
 if __name__ == "__main__":

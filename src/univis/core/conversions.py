@@ -1,4 +1,9 @@
-"""Conversion orchestration for active episode sources."""
+"""Conversion orchestration for active episode sources.
+
+This file currently stays above 250 lines because job state, threading, reports,
+and adapter-backed exporter binding are one tightly coupled workflow. Split the
+job store and runner once conversion overwrite/skip policies are added.
+"""
 
 from __future__ import annotations
 

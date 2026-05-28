@@ -1,4 +1,7 @@
 (function () {
+  // This entry file is temporarily above 250 lines because it wires the full
+  // single-page shell. Split viewer state and source state during the next UI
+  // refactor instead of growing this file further.
   const h = React.createElement;
   const { useEffect, useMemo, useState } = React;
   const { fetchJson, batchAnnotation } = window.UniVisApi;

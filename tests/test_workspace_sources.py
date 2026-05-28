@@ -6,7 +6,7 @@ from fastapi.testclient import TestClient
 
 from hdf5_fixtures import write_script_hdf5
 from pika_fixtures import write_pika_raw_episode
-from univis.app import create_app, parse_workspace_args
+from univis.app import create_app, parse_output_arg, parse_workspace_args
 
 
 def test_workspace_lists_children_and_activates_hdf5(tmp_path: Path) -> None:
@@ -79,3 +79,10 @@ def test_parse_workspace_args() -> None:
 
     assert parsed["raw"] == Path("/tmp/raw")
     assert parsed["hdf5"] == Path("/tmp/hdf5")
+
+
+def test_parse_output_arg() -> None:
+    """Verify CLI output parsing returns an optional export root."""
+
+    assert parse_output_arg("") is None
+    assert parse_output_arg("/tmp/exports") == Path("/tmp/exports")

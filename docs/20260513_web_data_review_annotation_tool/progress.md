@@ -85,3 +85,11 @@
 - Changed HDF5 export to write actual dexechain-style h5ffmpeg video chunks through an internal `DexH5FFmpegCodec` instead of gzip image chunks. The codec mirrors dexechain's x264 defaults and keeps RTX 3060 NVENC selection as a codec strategy rather than a superclass dependency.
 - Removed core-session coupling to the HDF5 class by replacing `isinstance(HDF5EpisodeAdapter)` conversion status logic with adapter capability metadata.
 - Updated HDF5 tests to reflect compressed video behavior: exporter tests now use adapter-backed fixture images, and image comparisons allow small x264 loss instead of expecting byte-identical pixels.
+
+## 2026-05-28
+- Added CLI-configured export root support through `--output PATH`. Conversion API/UI now resolve browser-entered output values as safe relative subpaths below the configured root instead of accepting arbitrary absolute output paths.
+- Added `/api/conversions/config`, `OutputRootManager`, frontend output-root display, and conversion request `output_subpath` wiring for single and accepted-only export jobs.
+- Updated the browser tab title to `UniVis version 0.1`.
+- Rewrote `README.md` as a user-facing guide covering project goals, architecture, installation, workspace/output startup, source selection, annotation, batch export, screenshot placeholders, testing, and future extensibility.
+- Verified with full pytest (`42 passed`), frontend `node --check`, and Python `compileall`.
+- Updated `run.sh` to use `--output /home/dex/app/UniVis/output` instead of registering output as a data workspace.

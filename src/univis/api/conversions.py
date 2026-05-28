@@ -8,6 +8,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from univis.core.conversions import ConversionService
+from univis.core.output_roots import OutputRootManager
 
 
 class ConversionRequest(BaseModel):
@@ -15,13 +16,14 @@ class ConversionRequest(BaseModel):
 
     Inputs:
         exporter_name: Registered exporter component name.
-        output_root: Optional server-local output directory.
+        output_subpath: Optional relative path below the configured export root.
         preprocessors: Optional list of preprocessor names to apply.
     Output:
         Validated conversion request.
     """
 
     exporter_name: str
+    output_subpath: str = ""
     output_root: str = ""
     preprocessors: list[str] = []
 
@@ -33,6 +35,7 @@ class ConversionRouter:
         """Initialize conversion routes."""
 
         self.service = service
+        self.output_roots = OutputRootManager(service.default_output_root)
         self.router = APIRouter(prefix="/api/conversions")
         self._register()
 
@@ -47,6 +50,7 @@ class ConversionRouter:
         self.router.add_api_route("/accepted", self.convert_accepted, methods=["POST"])
         self.router.add_api_route("/jobs", self.list_jobs, methods=["GET"])
         self.router.add_api_route("/jobs/{job_id}", self.get_job, methods=["GET"])
+        self.router.add_api_route("/config", self.config, methods=["GET"])
 
     def convert_episode(self, episode_id: str, request: ConversionRequest) -> dict:
         """Convert one active episode."""
@@ -80,6 +84,11 @@ class ConversionRouter:
 
         return [job.model_dump() for job in self.service.list_jobs()]
 
+    def config(self) -> dict[str, str]:
+        """Return conversion output configuration."""
+
+        return self.output_roots.config()
+
     def get_job(self, job_id: str) -> dict:
         """Return one conversion job."""
 
@@ -89,5 +98,5 @@ class ConversionRouter:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
 
     def _output_root(self, request: ConversionRequest) -> Path | None:
-        raw = request.output_root.strip()
-        return Path(raw).expanduser() if raw else None
+        raw = request.output_subpath.strip() or request.output_root.strip()
+        return self.output_roots.resolve(raw)

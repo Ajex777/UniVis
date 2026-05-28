@@ -19,7 +19,7 @@ def test_raw_annotation_review_and_single_hdf5_conversion(tmp_path: Path) -> Non
     raw_root = tmp_path / "raw"
     output_root = tmp_path / "out"
     write_pika_raw_episode(raw_root, frames=56)
-    client = TestClient(create_app(workspaces={"raw": raw_root}))
+    client = TestClient(create_app(workspaces={"raw": raw_root}, output_root=output_root))
 
     activated = client.post(
         "/api/workspaces/source",
@@ -45,7 +45,7 @@ def test_raw_annotation_review_and_single_hdf5_conversion(tmp_path: Path) -> Non
 
     converted = client.post(
         f"/api/conversions/episodes/{episode_id}",
-        json={"exporter_name": "HDF5EpisodeExporter", "output_root": str(output_root)},
+        json={"exporter_name": "HDF5EpisodeExporter", "output_subpath": "reviewed"},
     )
     assert converted.status_code == 200
     job = wait_job(client, converted.json()["job_id"])
@@ -53,7 +53,7 @@ def test_raw_annotation_review_and_single_hdf5_conversion(tmp_path: Path) -> Non
     assert Path(job["items"][0]["output_path"]).exists()
 
     adapter = HDF5EpisodeAdapter()
-    source = EpisodeSource(root_path=output_root)
+    source = EpisodeSource(root_path=output_root / "reviewed")
     exported = adapter.load_episode(episode_id, source)
     metadata = client.get(f"/api/episodes/{episode_id}/metadata").json()
     trajectory = client.get(f"/api/episodes/{episode_id}/trajectory").json()
@@ -76,7 +76,7 @@ def test_accepted_batch_conversion_skips_pending(tmp_path: Path) -> None:
     output_root = tmp_path / "out"
     write_pika_raw_episode(raw_root, episode_name="episode0", frames=56)
     write_pika_raw_episode(raw_root, episode_name="episode1", frames=56)
-    client = TestClient(create_app(workspaces={"raw": raw_root}))
+    client = TestClient(create_app(workspaces={"raw": raw_root}, output_root=output_root))
 
     activated = client.post(
         "/api/workspaces/source",
@@ -94,16 +94,32 @@ def test_accepted_batch_conversion_skips_pending(tmp_path: Path) -> None:
 
     converted = client.post(
         "/api/conversions/accepted",
-        json={"exporter_name": "HDF5EpisodeExporter", "output_root": str(output_root)},
+        json={"exporter_name": "HDF5EpisodeExporter", "output_subpath": "accepted"},
     )
     assert converted.status_code == 200
     job = wait_job(client, converted.json()["job_id"])
 
     assert job["total"] == 1
     assert job["items"][0]["episode_id"] == "episode1"
-    assert (output_root / "conversion_report.json").exists()
-    episodes = HDF5EpisodeAdapter().list_metadata(EpisodeSource(root_path=output_root))
+    assert (output_root / "accepted" / "conversion_report.json").exists()
+    episodes = HDF5EpisodeAdapter().list_metadata(EpisodeSource(root_path=output_root / "accepted"))
     assert [episode.episode_id for episode in episodes] == ["episode1"]
+
+
+def test_conversion_output_subpath_stays_under_configured_root(tmp_path: Path) -> None:
+    """Verify conversion output paths are resolved under the CLI output root."""
+
+    client = TestClient(create_app(output_root=tmp_path / "exports"))
+    config = client.get("/api/conversions/config")
+    assert config.status_code == 200
+    assert config.json()["root"] == str((tmp_path / "exports").resolve())
+
+    response = client.post(
+        "/api/conversions/accepted",
+        json={"exporter_name": "HDF5EpisodeExporter", "output_subpath": "../escape"},
+    )
+    assert response.status_code == 400
+    assert "cannot contain '..'" in response.json()["detail"]
 
 
 def wait_job(client: TestClient, job_id: str, timeout: float = 5.0) -> dict:
