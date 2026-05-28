@@ -14,7 +14,6 @@ from univis.api.conversions import ConversionRouter
 from univis.api.routes import Phase00Router
 from univis.api.uploads import UploadRouter
 from univis.api.workspaces import WorkspaceRouter
-from univis.adapters.pika_raw import PikaRawEpisodeAdapter
 from univis.core.components import ComponentRegistry
 from univis.core.conversions import ConversionService
 from univis.core.episode_session import EpisodeSession
@@ -57,8 +56,7 @@ class UniVisAppContext:
         self.static_dir = static_dir or package_dir / "web" / "static"
         self.uploads_root = uploads_root or package_dir.parents[1] / ".univis" / "uploads"
         format_components = load_format_components()
-        self.pika_adapter = PikaRawEpisodeAdapter()
-        self.adapters = format_components.input_adapters + [self.pika_adapter]
+        self.adapters = format_components.input_adapters
         self.session = EpisodeSession(
             adapters=self.adapters,
             default_adapter_name=self.adapters[0].info().name,

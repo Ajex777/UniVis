@@ -1,0 +1,45 @@
+format:
+  name: pika_raw
+  label: PIKA Raw
+
+source:
+  episode_pattern: "episode*"
+  instruction_file: instructions.json
+  cameras:
+    left_wrist:
+      key: cam_left_wrist
+      label: Left Wrist
+      path: camera/color/pikaDepthCamera_l
+      suffixes: [".jpg", ".jpeg", ".png"]
+    right_wrist:
+      key: cam_right_wrist
+      label: Right Wrist
+      path: camera/color/pikaDepthCamera_r
+      suffixes: [".jpg", ".jpeg", ".png"]
+  pose:
+    left_path: localization/pose/pika_l
+    right_path: localization/pose/pika_r
+    fields: ["x", "y", "z", "roll", "pitch", "yaw"]
+  gripper:
+    left_path: gripper/encoder/pika_l
+    right_path: gripper/encoder/pika_r
+
+sync:
+  reference_camera: left_wrist
+  matched_camera: right_wrist
+  camera_tolerance_ms: 30.0
+  pose_tolerance_ms: 30.0
+  min_frames: 50
+  downsample_rate: 1.0
+
+processing:
+  static_trim:
+    enabled: true
+    translation_m: 0.02
+    rotation_deg: 5.0
+  pose_rebase:
+    enabled: true
+  gripper_normalization:
+    key: distance
+    min: 0.0
+    max: 0.095
