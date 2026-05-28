@@ -93,3 +93,6 @@
 - Rewrote `README.md` as a user-facing guide covering project goals, architecture, installation, workspace/output startup, source selection, annotation, batch export, screenshot placeholders, testing, and future extensibility.
 - Verified with full pytest (`42 passed`), frontend `node --check`, and Python `compileall`.
 - Updated `run.sh` to use `--output /home/dex/app/UniVis/output` instead of registering output as a data workspace.
+- Refactored PIKA raw into a first-class format package under `src/univis/formats/pika_raw/`. `app.py` now receives PIKA through `load_format_components()` instead of hard-coding `PikaRawEpisodeAdapter`, while `univis.adapters.pika_*` remains as compatibility imports.
+- Added structured PIKA YAML defaults at `formats/pika_raw/config/default.yaml` and `PikaRawFormatConfig` loading. PIKA-specific layout, camera names, sync tolerances, static trimming, pose rebasing, and gripper normalization now live in the format package configuration instead of being scattered through adapter registration.
+- Verified PIKA format refactor with full pytest (`43 passed`) and wheel build inspection; packaged wheel includes `univis/formats/pika_raw/config/default.yaml`.

@@ -18,6 +18,9 @@ UniVis 中的**格式（format）**是 `src/univis/formats/` 下的一个独立 
 | `__init__.py` | 是 | 导出 `ComponentBundle` 工厂函数 |
 
 格式包可选地包含 `exporter.py`（一个 `EpisodeExporter` 子类），但多数格式初期只需 adapter。
+如果该格式有自己的同步、裁剪、坐标变换或归一化参数，优先在格式子包内放置结构化 YAML
+（例如 `config/default.yaml`），再由 `settings.py` 或类似模块加载为 dataclass/pydantic 配置对象。
+不要把格式专属参数散落硬编码到全局文档、网络层或 app factory 中。
 
 ## 详细步骤
 

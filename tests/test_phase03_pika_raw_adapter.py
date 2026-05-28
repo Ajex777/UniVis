@@ -10,12 +10,13 @@ from PIL import Image
 from pika_fixtures import write_pika_raw_episode
 from univis.adapters.base import EpisodeSource
 from univis.adapters.hdf5 import HDF5EpisodeAdapter
-from univis.adapters.pika_manifest import scan_pika_episode
-from univis.adapters.pika_raw import PikaRawEpisodeAdapter
-from univis.adapters.pika_sync import PikaSyncOptions
 from univis.app import create_app
 from univis.domain.policy_episode import Annotation
 from univis.exporters.hdf5 import HDF5EpisodeExporter
+from univis.formats.pika_raw.adapter import PikaRawEpisodeAdapter
+from univis.formats.pika_raw.settings import PikaRawFormatConfig
+from univis.formats.pika_raw.manifest import scan_pika_episode
+from univis.formats.pika_raw.options import PikaSyncOptions
 from univis.utils.hdf5_episode import frames_to_qpos
 
 
@@ -38,6 +39,19 @@ def test_pika_raw_adapter_loads_policy_episode(tmp_path: Path) -> None:
         frames_to_qpos(episode.frames),
         adapter.synchronizer.synchronize(scan_pika_episode(episode_dir)).qpos,
     )
+
+
+def test_pika_raw_default_config_loads_structured_yaml() -> None:
+    """Verify PIKA-specific processing knobs are loaded from YAML."""
+
+    config = PikaRawFormatConfig.load()
+
+    assert config.layout.episode_pattern == "episode*"
+    assert config.layout.left_camera.key == "cam_left_wrist"
+    assert config.sync.camera_tolerance_ms == 30.0
+    assert config.sync.trim_static_boundaries is True
+    assert config.sync.static_translation_m == 0.02
+    assert config.sync.rebase_to_first_frame is True
 
 
 def test_pika_raw_adapter_serves_image_and_writes_instruction(tmp_path: Path) -> None:

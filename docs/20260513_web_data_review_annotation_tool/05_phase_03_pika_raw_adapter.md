@@ -1,8 +1,8 @@
-# Phase 03: Pika Raw Adapter
+# Phase 03: Pika Raw Format
 
 ## Goal
 
-实现 `PikaRawEpisodeAdapter`，把 PIKA raw data 同步为 `PolicyEpisode`。拆分后需要和当前转换脚本逐帧一致，作为回归测试标准。
+实现 `univis.formats.pika_raw`，把 PIKA raw data 同步为 `PolicyEpisode`。拆分后需要和当前转换脚本逐帧一致，作为回归测试标准。
 
 ## Scope
 
@@ -14,10 +14,12 @@
 
 ## Current Implementation Notes
 
-- 已新增 `PikaRawEpisodeAdapter`，注册名为 `PikaRawEpisodeAdapter`，前端输入格式下拉框会显示为 `PIKA Raw`。
-- 已新增 `PikaEpisodeSynchronizer`，复刻当前 `pika_raw_to_compressed_hdf5.py` 的同步顺序：左相机为基准、右相机 nearest match、pose/gripper 插值、首尾静止裁剪、downsample、双臂 20D qpos 拼接。
+- PIKA raw 已迁移为独立 format 子包：`src/univis/formats/pika_raw/`。`univis.adapters.pika_*` 仅保留兼容导入，不再承载真实实现。
+- `pika_raw_components()` 通过 `univis.formats.load_format_components()` 注册 `PikaRawEpisodeAdapter`，`app.py` 不再硬编码 PIKA adapter。
+- PIKA 专属目录布局、相机 key/label、同步容差、静止边界裁剪、pose rebase、gripper 归一化等默认参数集中在结构化 YAML：`src/univis/formats/pika_raw/config/default.yaml`。
+- 已新增 `PikaEpisodeSynchronizer`，按 YAML 配置执行同步顺序：左相机为基准、右相机 nearest match、pose/gripper 插值、首尾静止裁剪、downsample、双臂 20D qpos 拼接。
 - 当前实现不依赖 `dexechain/embodichain`，SE(3) 的 `xyz+rpy -> matrix -> xyz6d` 已在 UniVis 内部实现。
-- raw 图像不进入 `PolicyEpisode` 内存主体，adapter 通过 `get_image_frame()` 按需读取同步后的原始图片并返回 PNG。
+- raw 图像不进入 `PolicyEpisode` 内存主体，adapter 通过 `get_image_frame()` 按需读取同步后的原始图片，并尽量原样透传 JPEG/PNG。
 - `instructions.json` 已支持写回。写回时优先更新已有的 `instruction/text/prompt/language_prompt` 字段；没有这些字段时新增 `language_prompt`。
 - 前端目录选择在 `PIKA Raw` 模式下会递归收集选中目录内文件并上传到 server staging，然后由 adapter 扫描。
 - 已用 `/home/dex/app/tmp/pika_demo` 做真实目录烟测：默认参数下可识别 2 条 synchronized PIKA episode。
@@ -26,7 +28,7 @@
 ## Remaining Work
 
 - 与 legacy converter 进行更严格的 fixture 回归比对，确认 qpos 与 frame path 选择逐帧一致。
-- 为大 raw 目录上传增加分批/分片机制，避免一次性 multipart 过大。
+- 如需更多 PIKA 变体，优先扩展 `config/default.yaml` 或新增 YAML 配置加载入口，而不是在 adapter/sync 里继续增加硬编码。
 
 ## Acceptance
 
@@ -46,7 +48,7 @@
 
 - 不支持手动片段裁剪。
 - 不接其他 raw data 格式。
-- 不移除第一版中必要的兼容依赖，但依赖必须隔离在 adapter/compat 层。
+- 不移除第一版中必要的兼容导入，但真实实现必须隔离在 format 子包内。
 
 ## Named Workspace Source Flow
 
