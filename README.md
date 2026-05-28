@@ -143,4 +143,4 @@ UniVis 的扩展点尽量围绕抽象类组织：
 - 新预处理：实现 preprocessor，在导出前对 episode 或图像读取器做动作 masking、图像 masking、裁剪等处理。
 - 新可达性后端：实现 `ReachabilityBackend`，可以先接 dexechain IK，未来再替换为独立 IK backend。
 
-因此，长期目标是让 UniVis 逐渐成为独立于 dexechain/embodichain 的数据审查与转换工具。业务格式、导出格式、预处理和 IK 都可以作为插件式模块逐步替换，而网页交互层保持稳定。
+因此，长期目标是让 UniVis 逐渐成为独立于特定本体、特定框架的数据审查与转换工具。输入格式、导出格式、预处理和 IK 都可以作为插件式模块逐步替换，而网页交互层保持稳定。
