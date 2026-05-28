@@ -10,8 +10,20 @@ from fastapi import FastAPI
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
+from univis.api.conversions import ConversionRouter
 from univis.api.routes import Phase00Router
-from univis.data.fake_policy_episode import FakePolicyEpisodeRepository
+from univis.api.uploads import UploadRouter
+from univis.api.workspaces import WorkspaceRouter
+from univis.adapters.pika_raw import PikaRawEpisodeAdapter
+from univis.core.components import ComponentRegistry
+from univis.core.conversions import ConversionService
+from univis.core.episode_session import EpisodeSession
+from univis.core.uploads import UploadManager
+from univis.core.workspaces import WorkspaceManager
+from univis.exporters.mock import MockEpisodeExporter
+from univis.formats import load_format_components
+from univis.preprocessors import load_preprocessors
+from univis.reachability.mock import MockReachabilityBackend
 
 
 class UniVisAppContext:
@@ -23,18 +35,51 @@ class UniVisAppContext:
         Context object that can build a configured FastAPI application.
     """
 
-    def __init__(self, static_dir: Path | None = None) -> None:
+    def __init__(
+        self,
+        static_dir: Path | None = None,
+        uploads_root: Path | None = None,
+        workspaces: dict[str, Path | str] | None = None,
+        output_root: Path | str | None = None,
+    ) -> None:
         """Initialize dependency context.
 
         Inputs:
             static_dir: Optional override for static frontend files.
+            uploads_root: Optional override for dataset upload staging.
+            workspaces: Named server-local roots available to the frontend.
+            output_root: Server-local root used for exported datasets.
         Output:
             Context with repository and static file path.
         """
 
         package_dir = Path(__file__).resolve().parent
         self.static_dir = static_dir or package_dir / "web" / "static"
-        self.repository = FakePolicyEpisodeRepository()
+        self.uploads_root = uploads_root or package_dir.parents[1] / ".univis" / "uploads"
+        format_components = load_format_components()
+        self.pika_adapter = PikaRawEpisodeAdapter()
+        self.adapters = format_components.input_adapters + [self.pika_adapter]
+        self.session = EpisodeSession(
+            adapters=self.adapters,
+            default_adapter_name=self.adapters[0].info().name,
+        )
+        self.exporters = format_components.output_exporters + [MockEpisodeExporter()]
+        self.preprocessors = load_preprocessors()
+        self.preprocessor_map = {pp.info().name: pp for pp in self.preprocessors}
+        self.registry = ComponentRegistry(
+            input_adapters=self.adapters,
+            output_exporters=self.exporters,
+            reachability_backends=[MockReachabilityBackend()],
+            preprocessors=self.preprocessors,
+        )
+        self.upload_manager = UploadManager(self.uploads_root)
+        self.workspace_manager = WorkspaceManager(workspaces)
+        self.conversion_service = ConversionService(
+            self.session,
+            self.exporters,
+            Path(output_root).expanduser() if output_root else package_dir.parents[1] / ".univis" / "exports",
+            preprocessors=self.preprocessor_map,
+        )
 
     def create_app(self) -> FastAPI:
         """Create the FastAPI application.
@@ -46,7 +91,10 @@ class UniVisAppContext:
         """
 
         app = FastAPI(title="UniVis", version="0.1.0")
-        app.include_router(Phase00Router(self.repository).router)
+        app.include_router(Phase00Router(self.session, self.registry).router)
+        app.include_router(UploadRouter(self.upload_manager, self.session).router)
+        app.include_router(WorkspaceRouter(self.workspace_manager, self.session).router)
+        app.include_router(ConversionRouter(self.conversion_service).router)
         app.mount("/static", StaticFiles(directory=str(self.static_dir)), name="static")
 
         @app.get("/", include_in_schema=False)
@@ -64,7 +112,11 @@ class UniVisAppContext:
         return app
 
 
-def create_app() -> FastAPI:
+def create_app(
+    uploads_root: Path | None = None,
+    workspaces: dict[str, Path | str] | None = None,
+    output_root: Path | str | None = None,
+) -> FastAPI:
     """Build a UniVis FastAPI app with default context.
 
     Inputs:
@@ -73,7 +125,11 @@ def create_app() -> FastAPI:
         Configured FastAPI application.
     """
 
-    return UniVisAppContext().create_app()
+    return UniVisAppContext(
+        uploads_root=uploads_root,
+        workspaces=workspaces,
+        output_root=output_root,
+    ).create_app()
 
 
 app = create_app()
@@ -92,13 +148,55 @@ def main() -> None:
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8010)
     parser.add_argument("--reload", action="store_true")
+    parser.add_argument(
+        "--workspace",
+        action="append",
+        default=[],
+        metavar="NAME=PATH",
+        help="Register a server-local data workspace. Can be repeated.",
+    )
+    parser.add_argument(
+        "--output",
+        default="",
+        metavar="PATH",
+        help="Server-local export root. UI output paths are relative to this directory.",
+    )
     args = parser.parse_args()
+    runtime_app = create_app(
+        workspaces=parse_workspace_args(args.workspace),
+        output_root=parse_output_arg(args.output),
+    )
     uvicorn.run(
-        "univis.app:app",
+        runtime_app,
         host=str(args.host),
         port=int(args.port),
-        reload=bool(args.reload),
+        reload=False,
     )
+
+
+def parse_workspace_args(specs: list[str]) -> dict[str, Path]:
+    """Parse repeated `--workspace NAME=PATH` CLI values.
+
+    Inputs:
+        specs: Raw command-line workspace specifications.
+    Output:
+        Mapping from workspace name to local root path.
+    """
+
+    workspaces: dict[str, Path] = {}
+    for spec in specs:
+        if "=" not in spec:
+            raise ValueError(f"workspace must use NAME=PATH: {spec}")
+        name, raw_path = spec.split("=", 1)
+        workspaces[name.strip()] = Path(raw_path.strip()).expanduser()
+    return workspaces
+
+
+def parse_output_arg(spec: str | None) -> Path | None:
+    """Parse the optional `--output PATH` CLI value."""
+
+    clean = (spec or "").strip()
+    return Path(clean).expanduser() if clean else None
 
 
 if __name__ == "__main__":

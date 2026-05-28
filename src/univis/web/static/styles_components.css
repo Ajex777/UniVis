@@ -25,6 +25,7 @@
 
 .source-panel,
 .form-card {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -39,9 +40,16 @@
 .source-panel input,
 .source-panel select,
 .camera-title select,
+.form-card input,
 .form-card textarea {
   width: 100%;
   min-width: 0;
+}
+
+.source-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 6px;
 }
 
 .list-header {
@@ -77,15 +85,25 @@
   background: var(--panel-solid);
 }
 
-.episode-button.converting {
-  background: linear-gradient(90deg, var(--converted) var(--progress), var(--panel-solid) var(--progress));
+.episode-check {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  accent-color: var(--accent);
 }
 
-.episode-button.converted {
+.episode-button.review-pending {
+  background: rgba(167, 127, 28, 0.12);
+}
+
+.episode-button.review-accepted {
   background: rgba(20, 120, 95, 0.18);
 }
 
-.episode-button.rejected {
+.episode-button.review-rejected {
   background: rgba(155, 47, 63, 0.14);
 }
 
@@ -116,10 +134,10 @@
   width: 100%;
   height: 100%;
   min-height: 0;
-  object-fit: cover;
   border: 1px solid var(--line);
   border-radius: 6px;
   background: #e5ecef;
+  object-fit: cover;
 }
 
 .camera-title {
@@ -164,6 +182,13 @@
   background: var(--panel-solid);
 }
 
+.primary:disabled,
+.ghost:disabled,
+select:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
 .link-button {
   padding: 4px 8px;
   color: var(--accent);
@@ -188,5 +213,30 @@
 
 .reason {
   color: var(--danger);
+  font-size: 13px;
+}
+
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.checkbox-label input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.source-message {
+  margin: 0;
+  padding: 8px;
+  color: var(--danger);
+  background: rgba(155, 47, 63, 0.12);
+  border: 1px solid rgba(155, 47, 63, 0.35);
+  border-radius: 6px;
   font-size: 13px;
 }

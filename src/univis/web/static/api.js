@@ -6,18 +6,35 @@
    */
   async function fetchJson(url, options) {
     const response = await fetch(url, options);
-    if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
+    if (!response.ok) {
+      let detail = `${response.status} ${response.statusText}`;
+      try {
+        const payload = await response.json();
+        detail = payload.detail || detail;
+      } catch (_error) {
+        detail = `${response.status} ${response.statusText}`;
+      }
+      throw new Error(detail);
+    }
     return response.json();
   }
 
-  /**
-   * Return the image URL for a generated camera frame.
-   * Input: episode id, camera key, and frame index.
-   * Output: API URL string for an SVG image.
-   */
   function frameUrl(episodeId, cameraKey, frameIndex) {
     return `/api/episodes/${episodeId}/frame/${cameraKey}/${frameIndex}`;
   }
 
-  window.UniVisApi = { fetchJson, frameUrl };
+  /**
+   * Apply one annotation to multiple episodes.
+   * Input: list of episode IDs and an annotation payload.
+   * Output: batch result containing per-episode status.
+   */
+  async function batchAnnotation(episodeIds, annotation) {
+    return fetchJson("/api/episodes/batch/annotation", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ episode_ids: episodeIds, annotation }),
+    });
+  }
+
+  window.UniVisApi = { fetchJson, frameUrl, batchAnnotation };
 })();
