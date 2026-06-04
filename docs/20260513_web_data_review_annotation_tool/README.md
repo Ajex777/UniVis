@@ -13,6 +13,7 @@
 - [07_phase_05_conversion_workflow.md](./07_phase_05_conversion_workflow.md): 转换任务流程。
 - [08_phase_06_reachability_backend.md](./08_phase_06_reachability_backend.md): 可达性 backend。
 - [09_phase_07_dataset_workbench.md](./09_phase_07_dataset_workbench.md): 数据集级工作台。
+- [10_phase_08_trajectory_quality_dtw.md](./10_phase_08_trajectory_quality_dtw.md): 基于 DTW 的轨迹一致性质量评估。
 - [findings.md](./findings.md): 当前代码与 LeForge 参考调研记录。
 - [task_plan.md](./task_plan.md): 本次文档整理计划。
 - [progress.md](./progress.md): 文档整理进度。

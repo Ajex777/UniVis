@@ -35,3 +35,4 @@ def test_registry_endpoint_lists_real_input_adapters() -> None:
     assert pika_source["directory_upload"] == "recursive"
     assert payload["output_exporters"][0]["name"] == "HDF5EpisodeExporter"
     assert payload["reachability_backends"][0]["name"] == "MockReachabilityBackend"
+    assert payload["quality_backends"][0]["name"] == "DTWTrajectoryQualityBackend"

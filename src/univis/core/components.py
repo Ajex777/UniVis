@@ -42,6 +42,7 @@ class ComponentRegistry:
         input_adapters: Registered raw/HDF5 episode adapters.
         output_exporters: Registered output format exporters.
         reachability_backends: Registered reachability implementations.
+        quality_backends: Registered trajectory quality implementations.
     Output:
         Registry object that can produce API-safe dropdown metadata.
     """
@@ -49,6 +50,7 @@ class ComponentRegistry:
     input_adapters: list[object] = field(default_factory=list)
     output_exporters: list[object] = field(default_factory=list)
     reachability_backends: list[object] = field(default_factory=list)
+    quality_backends: list[object] = field(default_factory=list)
     preprocessors: list[object] = field(default_factory=list)
 
     def api_payload(self) -> dict[str, list[dict[str, object]]]:
@@ -64,6 +66,7 @@ class ComponentRegistry:
             "input_adapters": self._dump(self.input_adapters),
             "output_exporters": self._dump(self.output_exporters),
             "reachability_backends": self._dump(self.reachability_backends),
+            "quality_backends": self._dump(self.quality_backends),
             "preprocessors": self._dump(self.preprocessors),
         }
 

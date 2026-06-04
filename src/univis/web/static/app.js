@@ -8,6 +8,7 @@
   const SourceIO = window.UniVisSourceIO;
   const { CameraCard, EpisodeButton, SourceControls, defaultSlots } = window.UniVisComponents;
   const { GripperChart, useTrajectoryPlot } = window.UniVisPlots;
+  const { QualityPanel } = window.UniVisQualityComponents;
 
 function App() {
   const [episodes, setEpisodes] = useState([]);
@@ -33,7 +34,14 @@ function App() {
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [batchMessage, setBatchMessage] = useState("");
   const [activePreprocessors, setActivePreprocessors] = useState(new Set());
-  useTrajectoryPlot("trajectory-plot", trajectory, frameIndex);
+  const [dtwOverlay, setDtwOverlay] = useState(null);
+  const [dtwState, setDtwState] = useState({
+    expanded: false,
+    enabled: false,
+    referenceId: "",
+    referenceTitle: "",
+  });
+  useTrajectoryPlot("trajectory-plot", trajectory, frameIndex, dtwOverlay);
 
   useEffect(() => {
     Promise.all([
@@ -176,6 +184,13 @@ function App() {
     setSourceMode(modeText || payload.mode || "Mode: source selected");
     setSourceRevision((value) => value + 1);
     setMessage(`Loaded ${items.length} episode(s)`);
+    setDtwOverlay(null);
+    setDtwState({
+      expanded: false,
+      enabled: false,
+      referenceId: "",
+      referenceTitle: "",
+    });
   };
 
   const sourceControls = h(SourceControls, {
@@ -274,6 +289,19 @@ function App() {
         message: annotationMessage, batchCount: selectedIds.size,
         onBatchApply: batchApplyAnnotation, batchMessage,
       }),
+      h("div", { className: "form-card quality-area" },
+        h("strong", null, "Quality"),
+        h(QualityPanel, {
+          episodeId,
+          currentTitle: metadata.title,
+          episodes,
+          selectedIds,
+          sourceRevision,
+          dtwState,
+          onDtwState: setDtwState,
+          onOverlayChange: setDtwOverlay,
+        }),
+      ),
     ),
   );
 }

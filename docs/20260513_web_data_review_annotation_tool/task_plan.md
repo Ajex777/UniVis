@@ -18,12 +18,14 @@
 | Phase 03 PIKA raw adapter | in progress | First adapter pass, named workspace local-first source flow, and PIKA raw -> HDF5 image-preserving export are implemented. Legacy converter regression remains. |
 | Phase 04 annotation review | in progress | Prompt/status/notes/tags persist for PIKA raw and HDF5 through adapter writeback; list filtering remains. |
 | Phase 05 conversion workflow | in progress | Background single current-episode and accepted-only batch conversion APIs/UI are implemented with job progress and `conversion_report.json`; overwrite/skip options remain. |
+| Phase 08 trajectory quality DTW | in progress | First implementation pass added `univis.quality` DTW backend, quality APIs, Quality/DTW UI block, 3D current/reference overlay, draggable metrics popup, and selected stats popup. Needs real dataset UX verification. |
 
 ## Decisions
 | Topic | Decision |
 | --- | --- |
 | Doc location | `/home/dex/app/UniVis/docs/20260513_web_data_review_annotation_tool/` |
 | Output language | Chinese, because the product discussion is in Chinese. |
+| DTW integration boundary | DTW quality evaluation consumes `PolicyEpisode` and stays independent from PIKA/HDF5/LeRobot format adapters. |
 
 ## Errors Encountered
 | Error | Attempt | Resolution |
