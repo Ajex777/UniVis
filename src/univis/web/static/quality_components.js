@@ -66,22 +66,6 @@
       setMessage(`已成功将 ${item?.title || props.episodeId} 作为 reference 轨迹，所有轨迹将与该轨迹进行 dynamic time warping 对比。`);
     }
 
-    async function setMedoidReference() {
-      try {
-        const payload = await QualityIO.findMedoidReference(
-          props.episodes.map((episode) => episode.episode_id),
-        );
-        props.onDtwState({
-          ...state,
-          referenceId: payload.reference_episode_id,
-          referenceTitle: payload.title || payload.reference_episode_id,
-        });
-        setMessage(`已成功将 ${payload.title || payload.reference_episode_id} 作为 medoid reference 轨迹。`);
-      } catch (error) {
-        setMessage(error.message);
-      }
-    }
-
     async function computeSelectedStats() {
       if (!referenceId || !props.selectedIds.size) return;
       try {
@@ -112,7 +96,6 @@
           ),
           h("p", { className: "meta" }, `Reference: ${referenceLabel}`),
           h("button", { className: "primary", onClick: setCurrentReference, disabled: !props.episodeId }, "Use current as reference"),
-          h("button", { className: "ghost", onClick: setMedoidReference, disabled: !props.episodes.length }, "Find medoid reference"),
           h("button", {
             className: "ghost",
             onClick: computeSelectedStats,

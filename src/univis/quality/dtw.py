@@ -158,24 +158,6 @@ class DTWTrajectoryQualityBackend(TrajectoryQualityBackend):
             abnormal_episodes=scores[:10],
         )
 
-    def choose_medoid(self, episodes: list[PolicyEpisode]) -> str:
-        """Return the episode id with the lowest total DTW distance."""
-
-        if not episodes:
-            raise ValueError("no episodes provided")
-        totals = np.zeros(len(episodes), dtype=np.float64)
-        for i in range(len(episodes)):
-            for j in range(i + 1, len(episodes)):
-                comparison = self.compare(episodes[i], episodes[j])
-                distance = (
-                    comparison.left.summary.dtw_cost_normalized
-                    + comparison.right.summary.dtw_cost_normalized
-                )
-                totals[i] += distance
-                totals[j] += distance
-        return episodes[int(np.argmin(totals))].metadata.episode_id
-
-
 def _aggregate(summaries: list[ArmDTWSummary]) -> dict[str, float]:
     """Aggregate a list of arm summaries for selected stats."""
 
