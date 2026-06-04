@@ -2,59 +2,47 @@
 
 UniVis 是一个面向双臂具身操作的本地优先 Web 可视化、审查、标注与导出工具，核心思想是把不同来源的数据统一转换成内存中的同步轨迹 `PolicyEpisode`，再由同一套网页界面完成可视化、语言标注、质量审查和批量导出。
 
-## 项目目标
+<img src="images/univis.png" alt="UniVis GUI 展示" width="800">
 
-UniVis 希望替代彼此独立的数据转换、数据预处理、数据标注、数据质量检查等阶段，让数据处理流程变成：
+## 一、项目目标
 
-1. 选择一个本机数据目录。
-2. 选择输入数据格式，例如 PIKA raw、compressed HDF5、LeRobot v3。
-3. 在网页中逐条查看图像、轨迹、夹爪状态和可达性提示。
-4. 给 episode 写入语言标注、接受或拒绝审查结果。
-5. 将当前 episode 或所有 accepted episode 批量导出到目标格式。
+UniVis 旨在可视化以及处理所有基于双臂 End Effector 的数据，任意输入格式的数据都应该能轻易地被添加到 UniVis 中并复用现成的可视化与处理 pipeline。目前支持的数据 pipeline 为：
+
+1. 本体数据选择：选择一个本机数据目录。
+2. 选择输入数据格式：如 PIKA raw、compressed HDF5、LeRobot v3。
+3. 可视化数据检查：在网页中逐条查看图像、轨迹、夹爪状态，以及数据质量。
+4. 数据语言标注：对于raw data，给 episode 写入语言标注、接受或拒绝审查结果。
+5. 数据预处理：在导出时应用选中的数据预处理操作。
+6. 数据格式转换：将任意一种 input 数据类型转换为任意一种 output 数据类型。
 
 Version 0.1 假设 server 和 browser 运行在同一台机器上，因此使用 named workspace 共享本机目录，避免大规模上传原始图片或视频。
 
-## 设计概述
+## 二、安装
 
-UniVis 的主要数据链路是：
+UniVis使用 `uv` 进行高效的依赖管理。
 
-```text
-RawEpisodeAdapter -> PolicyEpisode -> EpisodeExporter
-```
-
-`RawEpisodeAdapter` 负责读取某一种输入格式，并输出帧同步的 `PolicyEpisode`。`EpisodeExporter` 负责把 `PolicyEpisode` 导出成某一种目标格式。网页只关心统一的 API，因此新增数据格式时不需要重写 UI。
-
-当前已接入的输入格式包括 compressed HDF5、PIKA raw 和 LeRobot v3。当前主要导出格式是 compressed HDF5。
-
-## 安装
-
-建议使用 Python 3.10 和 uv：
+首先，安装 `uv`:
 
 ```bash
-cd /home/dex/app/UniVis
-python3.10 -m pip install --user uv
+curl -LsSf https://astral.sh/uv/install.sh | sh
+```
+
+随后，一键安装依赖:
+
+```bash
 uv sync --extra dev
 ```
 
-如果你的机器上 `uv` 已安装在 `~/.local/bin/uv`，也可以直接使用：
-
-```bash
-cd /home/dex/app/UniVis
-~/.local/bin/uv sync --extra dev
-```
-
-## 启动
+## 三、启动
 
 最常用的启动方式是同时配置输入 workspace 和导出 output root：
 
 ```bash
-cd /home/dex/app/UniVis
 uv run univis \
-  --host 127.0.0.1 \
   --port 8010 \
-  --workspace raw=/home/dex/app/data \
-  --workspace hdf5=/home/dex/app/datasets \
-  --output /home/dex/app/exports
+  --workspace raw=/path/to/rawdata \
+  --workspace hdf5=/path/to/hdf5data \
+  --output /path/to/output
 ```
 
 启动后打开：
@@ -65,55 +53,85 @@ http://127.0.0.1:8010
 
 `--workspace NAME=PATH` 可以重复传入。`NAME` 会显示在网页的 Workspace source 下拉框中，`PATH` 是 server 端能直接访问的数据根目录。
 
-`--output PATH` 指定导出的根目录。网页里的输出路径输入框只填写这个根目录下的相对子路径，例如 `sort_book_0509/pos1`，最终会导出到 `/home/dex/app/exports/sort_book_0509/pos1`。
+<img src="images/workspace.png" alt="workspace 决定数据目录选择" width="500">
+
+`--output PATH` 指定导出的根目录。网页里的输出路径输入框只填写这个根目录下的相对子路径，例如 `sort_book_0509/pos1`，最终会导出到 `/path/to/output/sort_book_0509/pos1`。
+
+<img src="images/conversion.png" alt="output 决定导出路径" width="500">
 
 如果不指定 `--output`，默认导出到项目目录下的 `.univis/exports`。
 
-## 使用
+## 四、基本使用方法
 
-### 选择数据源
+> version: 0.1.0
 
-1. 在左侧先选择 `Input format`，例如 `PIKA Raw` 或 `Compressed HDF5`。
-2. 选择 `Workspace source`，例如 `raw` 或 `hdf5`。
-3. 用目录浏览器进入具体数据目录。
-4. 点击 `Use current` 加载当前目录，或选择列表中的某一项后点击 `Use selected`。
+围绕可视化，UniVis有多种使用方法，下面给出几种经典用法。
 
-PIKA raw 通常选择包含多个 `episode*` 子目录的数据目录，也可以直接选择某一个 episode 目录。HDF5 通常选择包含 `.hdf5` 文件的目录。
+### 4.1 PIKA数据实时采集与可视化
 
-<!-- TODO screenshot: 放置“左侧数据源选择区域”的截图，重点展示 Input format、Workspace source、Use current/Use selected。 -->
+1. 启动 UniVis，将 workspace 之一设置为 PIKA 原始数据存放的目录，另一个 workspace 设置为 output 的目录，用于后续检查导出的 HDF5。
 
-### 浏览与播放
+    ```
+    uv run univis \
+      --port 8010 \
+      --workspace raw=/path/to/realtime/rawdata \
+      --workspace output=/path/to/output \
+      --output /path/to/output
+    ```
 
-加载数据后，左侧 episode 列表会展示当前 source 中的 episode。点击任意 episode 可以切换查看。中间区域展示多路相机图像和轨迹，底部时间轴支持逐帧前进、后退和自动播放。
+2. 选择数据源
 
-播放速度支持 `0.5x`、`1x`、`2x`、`3x`。如果当前数据带有可达性结果，轨迹区域会展示可达与不可达帧的提示。
+    <img src="images/data_format.png" alt="选择数据源" width="300">
 
-<!-- TODO screenshot: 放置“主可视化页面”的截图，包含相机、轨迹、时间轴和右侧信息面板。 -->
 
-### 标注与审查
+3. 选择需要查看的 Episode
 
-右侧 Annotation 面板可以编辑语言标注、审查状态和 notes。常用状态是：
+    <img src="images/episodes.png" alt="选择episode" width="300">
 
-- `pending`：尚未审查。
-- `accepted`：确认可用于导出或训练。
-- `rejected`：拒绝使用。
+    点击 episode 右侧的单选框可以选中一条episode，可以用于后续的批量标注
 
-点击 `Save` 后，标注会通过当前输入 adapter 写回对应的数据源。PIKA raw 会写回 `instructions.json`，HDF5 会直接回写 HDF5 文件。
+4. 数据检查与导出
 
-左侧 episode 列表支持批量选择。选中多个 episode 后，可以把当前 annotation 批量应用到这些 episode。
+    <img src="images/usage.png" alt="功能介绍" width="500">
 
-<!-- TODO screenshot: 放置“Annotation 面板和批量选择 episode”的截图。 -->
+5. 随采随可视化
 
-### 导出
+    点击Refresh，可以重新加载当前目录，看到最新采集的 episode。从而做到采集一条即可处理一条。
 
-1. 在左侧选择 `Output format`，例如 `HDF5 Exporter`。
-2. 在右侧 Conversion 面板填写输出相对子路径，例如 `sort_book_0509/pos1`。
-3. 点击 `Export current` 导出当前 episode。
-4. 点击 `Export accepted` 导出所有状态为 `accepted` 的 episode。
+    <img src="images/refresh.png" alt="刷新" width="300">
 
-导出任务会在后台运行，面板下方会显示最近任务的进度。每次导出会在目标目录生成数据文件，并写入 `conversion_report.json`。
+### 4.2 数据质量检测 —— Dynamic Time Warping (DTW)
 
-<!-- TODO screenshot: 放置“Conversion 面板”的截图，重点展示 Output root、相对子路径输入框、Export current/accepted 和任务进度。 -->
+在模仿学习中，我们通常会定义一条专家轨迹，我们希望每次采集的数据和专家轨迹比较相似。现在，我们可以在 UniVis 中轻松直观地看到 DTW 的结果。
+
+1. 首先打开专家 episode
+
+2. 点击 DTW 展开操作栏，选中 Enable DTW
+
+    <img src="images/dtw.png" alt="DTW" width="300">
+
+3. 然后选择当前 episode 作为 reference
+
+    启动 dtw 后会弹出一个浮动窗口，展示 dtw 指标。
+
+    <img src="images/dtw_metrics.png" alt="DTW metric" width="300">
+
+4. 切换episode，以进行dtw对比
+
+    <img src="images/dtw_vis.png" alt="DTW visualization" width="600">
+
+5. 导出统计结果
+
+    从左侧 episode 处选中若干 episode，点击 Compute selected stats，便会计算出这样一张统计结果表
+
+
+    <img src="images/dtw_stats.png" alt="DTW stats" width="600">
+
+**进阶设置**:可以在 `UniVis/src/univis/quality/config/dtw/default.yaml` 中设置 dtw 参数
+
+### 4.3 补充标注/补充后处理
+
+UniVis 支持以 HDF5 格式为输入，并继续以 HDF5 格式输出，因此可以实现增量修改。使用方式和 4.1 基本一致，只需要将输入格式替换为 HDF5，并找到需要处理的 HDF5 目录即可。
 
 ## 测试
 
