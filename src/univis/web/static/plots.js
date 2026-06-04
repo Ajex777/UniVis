@@ -4,7 +4,7 @@
    * Input: DOM id, trajectory payload, and current frame index.
    * Output: Side effect that updates the Plotly scene.
    */
-  function useTrajectoryPlot(elementId, trajectory, frameIndex) {
+  function useTrajectoryPlot(elementId, trajectory, frameIndex, dtwOverlay) {
     React.useEffect(() => {
       if (!trajectory || !window.Plotly) return;
       const left = trajectory.left_xyz;
@@ -32,6 +32,29 @@
         z: [point[2]],
         marker: { size: 7, color },
       });
+      const linkTrace = (name, currentPoints, referencePoints, links, color) => {
+        const xs = [];
+        const ys = [];
+        const zs = [];
+        for (const pair of links || []) {
+          const current = currentPoints[pair[0]];
+          const reference = referencePoints[pair[1]];
+          if (!current || !reference) continue;
+          xs.push(current[0], reference[0], null);
+          ys.push(current[1], reference[1], null);
+          zs.push(current[2], reference[2], null);
+        }
+        return {
+          name,
+          type: "scatter3d",
+          mode: "lines",
+          x: xs,
+          y: ys,
+          z: zs,
+          line: { color, width: 2 },
+          opacity: 0.36,
+        };
+      };
       const data = [
         trace("left eef", left, "#14785f"),
         trace("right eef", right, "#b87300"),
@@ -40,6 +63,15 @@
         marker("left current", currentLeft, "#0b4f40"),
         marker("right current", currentRight, "#8f5600"),
       ];
+      if (dtwOverlay?.enabled && dtwOverlay.referenceTrajectory && dtwOverlay.comparison) {
+        const ref = dtwOverlay.referenceTrajectory;
+        data.push(
+          trace("left reference", ref.left_xyz, "#54b9a4", 4),
+          trace("right reference", ref.right_xyz, "#d6a33c", 4),
+          linkTrace("left DTW links", left, ref.left_xyz, dtwOverlay.comparison.left.visual_links, "#73958d"),
+          linkTrace("right DTW links", right, ref.right_xyz, dtwOverlay.comparison.right.visual_links, "#a98b53"),
+        );
+      }
       const layout = {
         margin: { l: 0, r: 0, t: 20, b: 0 },
         paper_bgcolor: "rgba(0,0,0,0)",
@@ -51,7 +83,7 @@
         uirevision: "keep-camera",
       };
       Plotly.react(elementId, data, layout, { displaylogo: false, responsive: true });
-    }, [elementId, trajectory, frameIndex]);
+    }, [elementId, trajectory, frameIndex, dtwOverlay]);
   }
 
   /**
