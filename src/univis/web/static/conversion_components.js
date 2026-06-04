@@ -3,7 +3,12 @@
   const { useEffect, useState } = React;
   const ConversionIO = window.UniVisConversionIO;
 
-  function PreprocessorCheckboxes({ items, active, onChange }) {
+  /**
+   * Render preprocessing toggles independently from conversion actions.
+   * Input: registered preprocessors, active names, and an update callback.
+   * Output: React form card, or null when no preprocessors are available.
+   */
+  function PreprocessingPanel({ items, active, onChange }) {
     if (!items?.length) return null;
     return h("div", { className: "form-card" },
       h("strong", null, "Preprocessing"),
@@ -29,7 +34,7 @@
    * Input: selected episode id, selected exporter name, and message handler.
    * Output: React panel for single and accepted-only batch conversion.
    */
-  function ConversionPanel({ episodeId, outputFormat, onMessage, preprocessors, activePreprocessors, onActivePreprocessors }) {
+  function ConversionPanel({ episodeId, outputFormat, onMessage, activePreprocessors }) {
     const [outputConfig, setOutputConfig] = useState(null);
     const [outputSubpath, setOutputSubpath] = useState("");
     const [busy, setBusy] = useState(false);
@@ -67,7 +72,6 @@
     }
 
     return h(React.Fragment, null,
-      h(PreprocessorCheckboxes, { items: preprocessors, active: activePreprocessors, onChange: onActivePreprocessors }),
       h("div", { className: "form-card" },
         h("strong", null, "Conversion"),
         h("p", { className: "meta" }, `Output root: ${outputConfig?.root || "loading..."}`),
@@ -116,5 +120,5 @@
     );
   }
 
-  window.UniVisConversionComponents = { ConversionPanel, ConversionRecords };
+  window.UniVisConversionComponents = { PreprocessingPanel, ConversionPanel, ConversionRecords };
 })();
