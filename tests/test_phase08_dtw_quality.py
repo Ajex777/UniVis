@@ -74,8 +74,8 @@ def test_left_and_right_metrics_remain_independent() -> None:
     assert comparison.right.summary.mean_position_error > 0.1
 
 
-def test_selected_stats_and_medoid() -> None:
-    """Backend should aggregate selected episodes and choose a medoid."""
+def test_selected_stats() -> None:
+    """Backend should aggregate selected episodes against one reference."""
 
     ref = _episode("ref", [0.0, 0.1, 0.2])
     close = _episode("close", [0.0, 0.11, 0.2])
@@ -84,7 +84,6 @@ def test_selected_stats_and_medoid() -> None:
     stats = backend.selected_stats([close, far], ref)
     assert stats.reference_episode_id == "ref"
     assert stats.abnormal_episodes[0].episode_id == "far"
-    assert backend.choose_medoid([ref, close, far]) in {"ref", "close"}
 
 
 def test_visual_links_are_decimated() -> None:

@@ -18,19 +18,6 @@
   }
 
   /**
-   * Ask the backend to choose a medoid reference episode.
-   * Input: optional episode id list.
-   * Output: reference episode id and title.
-   */
-  function findMedoidReference(episodeIds) {
-    return fetchJson("/api/quality/dtw/medoid-reference", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ episode_ids: episodeIds || [] }),
-    });
-  }
-
-  /**
    * Compute selected episode statistics against one reference.
    * Input: reference episode id and selected episode ids.
    * Output: SelectedEpisodeDTWStats payload.
@@ -46,5 +33,5 @@
     });
   }
 
-  window.UniVisQualityIO = { compareDTW, findMedoidReference, selectedStats };
+  window.UniVisQualityIO = { compareDTW, selectedStats };
 })();

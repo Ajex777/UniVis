@@ -39,7 +39,3 @@ class TrajectoryQualityBackend(ABC):
         reference: PolicyEpisode,
     ) -> SelectedEpisodeDTWStats:
         """Aggregate selected episode metrics against one reference."""
-
-    @abstractmethod
-    def choose_medoid(self, episodes: list[PolicyEpisode]) -> str:
-        """Choose the most representative episode id from a list."""

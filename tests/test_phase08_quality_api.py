@@ -85,13 +85,10 @@ def test_quality_compare_api() -> None:
     assert "visual_links" in payload["left"]
 
 
-def test_quality_medoid_and_selected_stats_api() -> None:
-    """Verify medoid and selected stats endpoints."""
+def test_quality_selected_stats_api() -> None:
+    """Verify selected stats endpoint."""
 
     client = _client()
-    medoid = client.post("/api/quality/dtw/medoid-reference", json={})
-    assert medoid.status_code == 200
-    assert medoid.json()["reference_episode_id"] in {"ref", "close"}
     stats = client.post(
         "/api/quality/dtw/selected-stats",
         json={"reference_episode_id": "ref", "episode_ids": ["close", "far"]},
