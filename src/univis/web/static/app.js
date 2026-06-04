@@ -283,11 +283,10 @@ function App() {
     h("aside", { className: "inspector" },
       h("div", { className: "form-card" }, h("strong", null, metadata.title), h("p", { className: "meta" }, `Frame ${frameIndex + 1}/${metadata.num_frames}`), currentReason ? h("p", { className: "reason" }, currentReason) : null),
       h("div", { className: "form-card" }, h("strong", null, "Gripper"), h(GripperChart, { trajectory, frameIndex })),
-      h(window.UniVisConversionComponents.ConversionPanel, { episodeId, outputFormat, onMessage: setMessage, preprocessors: registry?.preprocessors || [], activePreprocessors, onActivePreprocessors: setActivePreprocessors }),
-      h(window.UniVisAnnotationComponents.AnnotationPanel, {
-        annotation, onAnnotation: setAnnotation, onSave: saveAnnotation,
-        message: annotationMessage, batchCount: selectedIds.size,
-        onBatchApply: batchApplyAnnotation, batchMessage,
+      h(window.UniVisConversionComponents.PreprocessingPanel, {
+        items: registry?.preprocessors || [],
+        active: activePreprocessors,
+        onChange: setActivePreprocessors,
       }),
       h("div", { className: "form-card quality-area" },
         h("strong", null, "Quality"),
@@ -302,6 +301,12 @@ function App() {
           onOverlayChange: setDtwOverlay,
         }),
       ),
+      h(window.UniVisAnnotationComponents.AnnotationPanel, {
+        annotation, onAnnotation: setAnnotation, onSave: saveAnnotation,
+        message: annotationMessage, batchCount: selectedIds.size,
+        onBatchApply: batchApplyAnnotation, batchMessage,
+      }),
+      h(window.UniVisConversionComponents.ConversionPanel, { episodeId, outputFormat, onMessage: setMessage, activePreprocessors }),
     ),
   );
 }
