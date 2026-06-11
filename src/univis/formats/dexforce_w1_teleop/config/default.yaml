@@ -1,0 +1,114 @@
+format:
+  name: dexforce_w1_teleop
+  label: Dexforce W1 Teleop
+
+source:
+  episode_pattern: "*"
+  metadata_file: metadata.jsonl
+  qpos_pattern: "pose_record_*.json"
+  instruction_field: language_prompt
+
+cameras:
+  head_left:
+    key: camera_head_left
+    label: Head Left
+    camera_type: head
+    place: left
+    path: head/left
+    suffixes: [".jpg", ".jpeg", ".png"]
+  head_right:
+    key: camera_head_right
+    label: Head Right
+    camera_type: head
+    place: right
+    path: head/right
+    suffixes: [".jpg", ".jpeg", ".png"]
+  hand_left:
+    key: camera_hand_left
+    label: Hand Left
+    camera_type: hand
+    place: left
+    path: hand/left
+    suffixes: [".jpg", ".jpeg", ".png"]
+  hand_right:
+    key: camera_hand_right
+    label: Hand Right
+    camera_type: hand
+    place: right
+    path: hand/right
+    suffixes: [".jpg", ".jpeg", ".png"]
+
+qpos:
+  joint_order:
+    - ANKLE
+    - KNEE
+    - BUTTOCK
+    - WAIST
+    - NECK1
+    - NECK2
+    - LEFT_J1
+    - LEFT_J2
+    - LEFT_J3
+    - LEFT_J4
+    - LEFT_J5
+    - LEFT_J6
+    - LEFT_J7
+    - LEFT_GRIPPER
+    - RIGHT_J1
+    - RIGHT_J2
+    - RIGHT_J3
+    - RIGHT_J4
+    - RIGHT_J5
+    - RIGHT_J6
+    - RIGHT_J7
+    - RIGHT_GRIPPER
+    - LEFT_HAND_THUMB1
+    - LEFT_HAND_THUMB2
+    - LEFT_HAND_INDEX
+    - LEFT_HAND_MIDDLE
+    - LEFT_HAND_RING
+    - LEFT_HAND_PINKY
+    - RIGHT_HAND_THUMB1
+    - RIGHT_HAND_THUMB2
+    - RIGHT_HAND_INDEX
+    - RIGHT_HAND_MIDDLE
+    - RIGHT_HAND_RING
+    - RIGHT_HAND_PINKY
+  body:
+    waist_joint_names: [WAIST]
+    head_joint_names: [NECK1, NECK2]
+  arms:
+    left:
+      joint_names: [LEFT_J1, LEFT_J2, LEFT_J3, LEFT_J4, LEFT_J5, LEFT_J6, LEFT_J7]
+      gripper_name: LEFT_GRIPPER
+    right:
+      joint_names: [RIGHT_J1, RIGHT_J2, RIGHT_J3, RIGHT_J4, RIGHT_J5, RIGHT_J6, RIGHT_J7]
+      gripper_name: RIGHT_GRIPPER
+
+sync:
+  reference_camera: head_left
+  camera_tolerance_ms: 30.0
+  qpos_tolerance_ms: 30.0
+  min_frames: 45
+
+kinematics:
+  fk_impl: local_pytorch_kinematics
+  robot_type: DexforceW1
+  arm_kind: anthropomorphic
+  urdf_path: "/home/dex/.cache/dexechain_data/extract/DexforceW1V021/DexforceW1_v02_1.urdf"
+  left_end_frame: left_ee
+  right_end_frame: right_ee
+  left_root_without_waist: left_arm_base
+  right_root_without_waist: right_arm_base
+  waist_root: waist
+  has_waist: true
+  fail_policy: error
+
+processing:
+  gripper_normalization:
+    left:
+      min: 0.0
+      max: 1.0
+    right:
+      min: 0.0
+      max: 1.0

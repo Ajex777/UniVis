@@ -25,14 +25,16 @@ def test_registry_endpoint_lists_real_input_adapters() -> None:
     payload = response.json()
     assert [item["name"] for item in payload["input_adapters"]] == [
         "HDF5EpisodeAdapter",
+        "DexforceW1TeleopAdapter",
         "LeRobotV3EpisodeAdapter",
         "PikaRawEpisodeAdapter",
     ]
     assert payload["input_adapters"][0]["aliases"] == ["HDF5"]
-    assert payload["input_adapters"][1]["aliases"] == ["LeRobotV3"]
-    assert payload["input_adapters"][2]["aliases"] == ["PIKARaw"]
+    assert payload["input_adapters"][1]["aliases"] == ["W1Teleop"]
+    assert payload["input_adapters"][2]["aliases"] == ["LeRobotV3"]
+    assert payload["input_adapters"][3]["aliases"] == ["PIKARaw"]
     hdf5_source = payload["input_adapters"][0]["capabilities"]["source"]
-    pika_source = payload["input_adapters"][2]["capabilities"]["source"]
+    pika_source = payload["input_adapters"][3]["capabilities"]["source"]
     assert hdf5_source["directory_upload"] == "top_level_matching"
     assert hdf5_source["file_extensions"] == [".hdf5", ".h5"]
     assert pika_source["directory_upload"] == "recursive"
