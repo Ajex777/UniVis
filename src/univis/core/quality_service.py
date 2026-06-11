@@ -5,7 +5,11 @@ from __future__ import annotations
 from univis.core.episode_session import EpisodeSession
 from univis.domain.policy_episode import PolicyEpisode
 from univis.quality.base import TrajectoryQualityBackend
-from univis.quality.models import EpisodeDTWComparison, SelectedEpisodeDTWStats
+from univis.quality.models import (
+    EpisodeDTWComparison,
+    EpisodeSmoothnessReport,
+    SelectedEpisodeDTWStats,
+)
 
 
 class QualityService:
@@ -85,6 +89,19 @@ class QualityService:
         """
 
         return self.session.get_episode(episode_id)
+
+    def smooth_episode(
+        self,
+        episode_id: str,
+        backend_name: str = "SmoothnessTrajectoryQualityBackend",
+    ) -> EpisodeSmoothnessReport:
+        """Run a reference-free smoothness check for one active-source episode."""
+
+        backend = self._backend(backend_name)
+        if not hasattr(backend, "assess"):
+            raise TypeError(f"backend {backend_name} does not support smoothness assessment")
+        episode = self.session.get_episode(episode_id)
+        return backend.assess(episode)
 
     def list_episode_ids(self) -> list[str]:
         """Return active-source episode ids in adapter order.
