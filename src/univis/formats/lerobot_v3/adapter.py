@@ -51,6 +51,7 @@ class LeRobotV3EpisodeAdapter(RawEpisodeAdapter):
         return ComponentInfo(
             name="LeRobotV3EpisodeAdapter",
             label="LeRobot v3",
+            aliases=["LeRobotV3"],
             description="Reads LeRobot v3.0 datasets into PolicyEpisode objects.",
             capabilities={
                 "source": {

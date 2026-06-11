@@ -62,6 +62,7 @@ class PikaRawEpisodeAdapter(RawEpisodeAdapter):
         return ComponentInfo(
             name="PikaRawEpisodeAdapter",
             label="PIKA Raw",
+            aliases=["PIKARaw"],
             description="Reads PIKA raw folders into synchronized PolicyEpisode objects.",
             capabilities={
                 "source": {

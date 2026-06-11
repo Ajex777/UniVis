@@ -59,12 +59,18 @@ class EpisodeSession:
         self._episode_cache: dict[str, PolicyEpisode] = {}
         self._metadata_cache: dict[str, PolicyEpisodeMetadata] = {}
 
-    def set_source(self, adapter_name: str, root_path: str | None = None) -> dict:
+    def set_source(
+        self,
+        adapter_name: str,
+        root_path: str | None = None,
+        validate: bool = True,
+    ) -> dict:
         """Switch the active episode source.
 
         Inputs:
             adapter_name: Registered adapter component name.
             root_path: Optional file or directory path for file-backed adapters.
+            validate: Whether to run adapter validation before switching.
         Output:
             JSON-compatible active source summary.
         """
@@ -73,9 +79,10 @@ class EpisodeSession:
             raise KeyError(f"unknown adapter: {adapter_name}")
         source = EpisodeSource(root_path=Path(root_path)) if root_path else None
         adapter = self.adapters[adapter_name]
-        validation = adapter.validate_source(source)
-        if not validation.valid:
-            raise ValueError(validation.message)
+        if validate:
+            validation = adapter.validate_source(source)
+            if not validation.valid:
+                raise ValueError(validation.message)
         self.active = ActiveSource(adapter_name=adapter_name, source=source)
         self._episode_cache.clear()
         self._metadata_cache.clear()

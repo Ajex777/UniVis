@@ -97,3 +97,17 @@ def test_quality_selected_stats_api() -> None:
     payload = stats.json()
     assert payload["reference_episode_id"] == "ref"
     assert payload["abnormal_episodes"][0]["episode_id"] == "far"
+
+
+def test_quality_selected_stats_excludes_reference() -> None:
+    """Verify selected stats ignores the reference when it is selected."""
+
+    client = _client()
+    stats = client.post(
+        "/api/quality/dtw/selected-stats",
+        json={"reference_episode_id": "ref", "episode_ids": ["ref", "close"]},
+    )
+    assert stats.status_code == 200
+    payload = stats.json()
+    assert payload["selected_episode_ids"] == ["close"]
+    assert [item["episode_id"] for item in payload["abnormal_episodes"]] == ["close"]

@@ -47,6 +47,7 @@ class HDF5EpisodeAdapter(RawEpisodeAdapter):
         return ComponentInfo(
             name="HDF5EpisodeAdapter",
             label="Compressed HDF5",
+            aliases=["HDF5"],
             description="Reads dexechain-compatible compressed HDF5 episode files.",
             capabilities={
                 "source": {

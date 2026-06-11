@@ -3,6 +3,17 @@
   const { useEffect, useMemo, useRef, useState } = React;
   const QualityIO = window.UniVisQualityIO;
   const { fetchJson } = window.UniVisApi;
+  const METRIC_HELP = {
+    dtw_cost_normalized: "归一化 DTW cost。它是 DTW 总 cost 除以对齐路径长度，更适合比较不同长度的轨迹；数值越小表示越接近 reference。",
+    mean_position_error: "平均位置误差。DTW 匹配点之间 EEF 位置距离的平均值，单位是米。",
+    p95_position_error: "95 分位位置误差。95% 的 DTW 匹配点位置误差都不超过该值，单位是米。",
+    mean_rotation_error_deg: "平均旋转误差。DTW 匹配点之间 rot6d 转 rotation matrix 后的 geodesic 角度误差平均值，单位是度。",
+    warp_distortion: "时间扭曲程度。表示 DTW 为了对齐两条轨迹需要多强的时间拉伸；越大说明执行节奏差异越明显。",
+    dtw_cost_normalized_mean: "所有 selected episode 的归一化 DTW cost 平均值；数值越小表示整体越接近 reference。",
+    dtw_cost_normalized_p95: "所有 selected episode 的归一化 DTW cost 的 95 分位；用于观察大多数 episode 中较差的一批是否仍可接受。",
+    p95_position_error_mean: "先计算每条 episode 自己的 p95 位置误差，再对这些 p95 值取平均，单位是米。",
+    p95_rotation_error_deg_mean: "先计算每条 episode 自己的 p95 旋转误差，再对这些 p95 值取平均，单位是度。",
+  };
 
   function QualityPanel(props) {
     const state = props.dtwState || {};
@@ -110,7 +121,7 @@
   }
 
   function DTWMetricsPopup({ comparison, currentTitle, referenceTitle }) {
-    const [pos, setPos] = useState({ x: 420, y: 18 });
+    const [pos, setPos] = useState(defaultMetricsPopupPosition);
     return h("div", {
       className: "dtw-popup",
       style: { left: pos.x, top: pos.y },
@@ -123,14 +134,24 @@
     );
   }
 
+  function defaultMetricsPopupPosition() {
+    const target = document.getElementById("trajectory-plot");
+    if (!target) return { x: 420, y: 18 };
+    const rect = target.getBoundingClientRect();
+    return {
+      x: Math.max(12, rect.left + 16),
+      y: Math.max(12, rect.top + 16),
+    };
+  }
+
   function MetricBlock({ title, summary }) {
     return h("div", { className: "metric-block" },
       h("strong", null, title),
-      h("span", null, `DTW ${summary.dtw_cost_normalized.toFixed(3)}`),
-      h("span", null, `pos mean ${summary.mean_position_error.toFixed(4)}`),
-      h("span", null, `pos p95 ${summary.p95_position_error.toFixed(4)}`),
-      h("span", null, `rot mean ${summary.mean_rotation_error_deg.toFixed(2)}°`),
-      h("span", null, `warp ${summary.warp_distortion.toFixed(3)}`),
+      h(MetricItem, { label: "DTW", value: summary.dtw_cost_normalized.toFixed(3), helpKey: "dtw_cost_normalized" }),
+      h(MetricItem, { label: "pos mean", value: summary.mean_position_error.toFixed(4), helpKey: "mean_position_error" }),
+      h(MetricItem, { label: "pos p95", value: summary.p95_position_error.toFixed(4), helpKey: "p95_position_error" }),
+      h(MetricItem, { label: "rot mean", value: `${summary.mean_rotation_error_deg.toFixed(2)}°`, helpKey: "mean_rotation_error_deg" }),
+      h(MetricItem, { label: "warp", value: summary.warp_distortion.toFixed(3), helpKey: "warp_distortion" }),
     );
   }
 
@@ -157,11 +178,29 @@
   function StatsSummary({ title, summary }) {
     return h("div", { className: "metric-block" },
       h("strong", null, title),
-      h("span", null, `DTW mean ${summary.dtw_cost_normalized_mean?.toFixed(3) || "n/a"}`),
-      h("span", null, `DTW p95 ${summary.dtw_cost_normalized_p95?.toFixed(3) || "n/a"}`),
-      h("span", null, `pos p95 mean ${summary.p95_position_error_mean?.toFixed(4) || "n/a"}`),
-      h("span", null, `rot p95 mean ${summary.p95_rotation_error_deg_mean?.toFixed(2) || "n/a"}°`),
+      h(MetricItem, { label: "DTW mean", value: formatMaybe(summary.dtw_cost_normalized_mean, 3), helpKey: "dtw_cost_normalized_mean" }),
+      h(MetricItem, { label: "DTW p95", value: formatMaybe(summary.dtw_cost_normalized_p95, 3), helpKey: "dtw_cost_normalized_p95" }),
+      h(MetricItem, { label: "pos p95 mean", value: formatMaybe(summary.p95_position_error_mean, 4), helpKey: "p95_position_error_mean" }),
+      h(MetricItem, { label: "rot p95 mean", value: `${formatMaybe(summary.p95_rotation_error_deg_mean, 2)}°`, helpKey: "p95_rotation_error_deg_mean" }),
     );
+  }
+
+  function MetricItem({ label, value, helpKey }) {
+    return h("span", { className: "metric-item" },
+      h("span", { className: "metric-label" },
+        label,
+        h("span", {
+          className: "metric-help",
+          "data-tooltip": METRIC_HELP[helpKey] || "暂无说明",
+          "aria-label": METRIC_HELP[helpKey] || "暂无说明",
+        }, "?"),
+      ),
+      h("span", { className: "metric-value" }, value),
+    );
+  }
+
+  function formatMaybe(value, digits) {
+    return Number.isFinite(value) ? value.toFixed(digits) : "n/a";
   }
 
   function startDrag(event, pos, setPos) {

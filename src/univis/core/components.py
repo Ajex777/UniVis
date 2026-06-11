@@ -13,6 +13,7 @@ class ComponentInfo(BaseModel):
     Inputs:
         name: Stable class-like identifier.
         label: Human-friendly display label.
+        aliases: Short command-line names matched case-insensitively.
         description: Short explanation for UI dropdowns and diagnostics.
         capabilities: UI-safe behavior flags that avoid component-specific branching.
     Output:
@@ -21,6 +22,7 @@ class ComponentInfo(BaseModel):
 
     name: str
     label: str
+    aliases: list[str] = Field(default_factory=list)
     description: str = ""
     capabilities: dict[str, object] = Field(default_factory=dict)
 
@@ -80,3 +82,54 @@ class ComponentRegistry:
         """
 
         return [component.info().model_dump() for component in components]
+
+
+class ComponentNameResolver:
+    """Resolve component names and aliases with helpful diagnostics."""
+
+    def __init__(self, components: list[object], kind: str) -> None:
+        """Build a case-insensitive index for registered components.
+
+        Inputs:
+            components: Component instances exposing `info()`.
+            kind: Human-readable component kind for error messages.
+        Output:
+            Resolver that maps names/aliases to canonical component names.
+        """
+
+        self.kind = kind
+        self._components = components
+        self._index: dict[str, list[str]] = {}
+        for component in components:
+            info = component.info()
+            for token in [info.name, *info.aliases]:
+                self._index.setdefault(token.lower(), []).append(info.name)
+
+    def resolve(self, value: str) -> str:
+        """Resolve a user-provided name or alias to a canonical name.
+
+        Inputs:
+            value: Component name or alias from CLI/API-like callers.
+        Output:
+            Canonical `ComponentInfo.name`.
+        """
+
+        matches = sorted(set(self._index.get(value.lower(), [])))
+        if len(matches) == 1:
+            return matches[0]
+        if len(matches) > 1:
+            raise ValueError(
+                f"ambiguous {self.kind} `{value}`; candidates: {', '.join(matches)}"
+            )
+        raise ValueError(
+            f"unknown {self.kind} `{value}`; candidates: {', '.join(self.candidates())}"
+        )
+
+    def candidates(self) -> list[str]:
+        """Return canonical names and aliases for completion/help text."""
+
+        values: list[str] = []
+        for component in self._components:
+            info = component.info()
+            values.extend([info.name, *info.aliases])
+        return sorted(set(values), key=str.lower)

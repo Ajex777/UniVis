@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 from fastapi import APIRouter, HTTPException
 
 from univis.core.episode_session import EpisodeSession
+from univis.core.quality_service import QualityService
 from univis.quality.base import TrajectoryQualityBackend
 
 
@@ -35,8 +36,7 @@ class QualityRouter:
     ) -> None:
         """Initialize router with episode session and quality backends."""
 
-        self.session = session
-        self.backends = {backend.info().name: backend for backend in backends}
+        self.service = QualityService(session, backends)
         self.router = APIRouter(prefix="/api/quality")
         self._register()
 
@@ -50,16 +50,17 @@ class QualityRouter:
     def list_backends(self) -> list[dict]:
         """Return quality backend metadata."""
 
-        return [backend.info().model_dump() for backend in self.backends.values()]
+        return [backend.info().model_dump() for backend in self.service.backends.values()]
 
     def compare_dtw(self, request: DTWCompareRequest) -> dict:
         """Compare one current episode against a reference episode."""
 
         try:
-            backend = self._backend(request.backend_name)
-            current = self.session.get_episode(request.current_episode_id)
-            reference = self.session.get_episode(request.reference_episode_id)
-            return backend.compare(current, reference).model_dump()
+            return self.service.compare_dtw(
+                request.current_episode_id,
+                request.reference_episode_id,
+                request.backend_name,
+            ).model_dump()
         except KeyError as exc:
             raise HTTPException(status_code=404, detail="episode not found") from exc
         except Exception as exc:
@@ -69,21 +70,12 @@ class QualityRouter:
         """Aggregate selected episode DTW stats against one reference."""
 
         try:
-            backend = self._backend(request.backend_name)
-            reference = self.session.get_episode(request.reference_episode_id)
-            episodes = [
-                self.session.get_episode(episode_id)
-                for episode_id in request.episode_ids
-            ]
-            return backend.selected_stats(episodes, reference).model_dump()
+            return self.service.selected_stats(
+                request.reference_episode_id,
+                request.episode_ids,
+                request.backend_name,
+            ).model_dump()
         except KeyError as exc:
             raise HTTPException(status_code=404, detail="episode not found") from exc
         except Exception as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
-
-    def _backend(self, name: str) -> TrajectoryQualityBackend:
-        """Return a registered quality backend by name."""
-
-        if name not in self.backends:
-            raise KeyError(f"unknown quality backend: {name}")
-        return self.backends[name]

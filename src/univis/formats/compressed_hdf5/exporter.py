@@ -51,6 +51,7 @@ class HDF5EpisodeExporter(EpisodeExporter):
         return ComponentInfo(
             name="HDF5EpisodeExporter",
             label="Compressed HDF5",
+            aliases=["HDF5"],
             description="Writes dexechain-compatible compressed HDF5 episode files.",
             capabilities={"format": {"schema": "dexechain_compressed_hdf5"}},
         )
