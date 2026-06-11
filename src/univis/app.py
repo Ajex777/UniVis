@@ -23,7 +23,7 @@ from univis.core.workspaces import WorkspaceManager
 from univis.exporters.mock import MockEpisodeExporter
 from univis.formats import load_format_components
 from univis.preprocessors import load_preprocessors
-from univis.quality import DTWTrajectoryQualityBackend
+from univis.quality import DTWTrajectoryQualityBackend, SmoothnessTrajectoryQualityBackend
 from univis.reachability.mock import MockReachabilityBackend
 
 
@@ -66,7 +66,10 @@ class UniVisAppContext:
         self.exporters = format_components.output_exporters + [MockEpisodeExporter()]
         self.preprocessors = load_preprocessors()
         self.preprocessor_map = {pp.info().name: pp for pp in self.preprocessors}
-        self.quality_backends = [DTWTrajectoryQualityBackend()]
+        self.quality_backends = [
+            DTWTrajectoryQualityBackend(),
+            SmoothnessTrajectoryQualityBackend(),
+        ]
         self.registry = ComponentRegistry(
             input_adapters=self.adapters,
             output_exporters=self.exporters,

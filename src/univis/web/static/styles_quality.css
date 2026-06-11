@@ -126,6 +126,16 @@
   font-variant-numeric: tabular-nums;
 }
 
+.smooth-report {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.smooth-warning {
+  grid-column: 1 / -1;
+}
+
 .stats-modal {
   position: fixed;
   inset: 0;

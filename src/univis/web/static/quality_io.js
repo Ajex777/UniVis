@@ -33,5 +33,18 @@
     });
   }
 
-  window.UniVisQualityIO = { compareDTW, selectedStats };
+  /**
+   * Assess one episode's reference-free trajectory smoothness.
+   * Input: current episode id.
+   * Output: EpisodeSmoothnessReport payload.
+   */
+  function assessSmoothness(episodeId) {
+    return fetchJson("/api/quality/smooth/episode", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ episode_id: episodeId }),
+    });
+  }
+
+  window.UniVisQualityIO = { compareDTW, selectedStats, assessSmoothness };
 })();

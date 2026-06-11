@@ -26,6 +26,13 @@ class DTWSelectedStatsRequest(BaseModel):
     backend_name: str = "DTWTrajectoryQualityBackend"
 
 
+class SmoothEpisodeRequest(BaseModel):
+    """Request for one episode smoothness assessment."""
+
+    episode_id: str
+    backend_name: str = "SmoothnessTrajectoryQualityBackend"
+
+
 class QualityRouter:
     """Route container for trajectory quality APIs."""
 
@@ -46,6 +53,7 @@ class QualityRouter:
         self.router.add_api_route("/backends", self.list_backends, methods=["GET"])
         self.router.add_api_route("/dtw/compare", self.compare_dtw, methods=["POST"])
         self.router.add_api_route("/dtw/selected-stats", self.selected_stats, methods=["POST"])
+        self.router.add_api_route("/smooth/episode", self.smooth_episode, methods=["POST"])
 
     def list_backends(self) -> list[dict]:
         """Return quality backend metadata."""
@@ -73,6 +81,19 @@ class QualityRouter:
             return self.service.selected_stats(
                 request.reference_episode_id,
                 request.episode_ids,
+                request.backend_name,
+            ).model_dump()
+        except KeyError as exc:
+            raise HTTPException(status_code=404, detail="episode not found") from exc
+        except Exception as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    def smooth_episode(self, request: SmoothEpisodeRequest) -> dict:
+        """Assess one episode's trajectory smoothness."""
+
+        try:
+            return self.service.smooth_episode(
+                request.episode_id,
                 request.backend_name,
             ).model_dump()
         except KeyError as exc:

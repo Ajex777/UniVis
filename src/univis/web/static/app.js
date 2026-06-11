@@ -41,6 +41,11 @@ function App() {
     referenceId: "",
     referenceTitle: "",
   });
+  const [smoothState, setSmoothState] = useState({
+    expanded: false,
+    report: null,
+    message: "",
+  });
   useTrajectoryPlot("trajectory-plot", trajectory, frameIndex, dtwOverlay);
 
   useEffect(() => {
@@ -191,6 +196,11 @@ function App() {
       referenceId: "",
       referenceTitle: "",
     });
+    setSmoothState({
+      expanded: false,
+      report: null,
+      message: "",
+    });
   };
 
   const sourceControls = h(SourceControls, {
@@ -297,7 +307,9 @@ function App() {
           selectedIds,
           sourceRevision,
           dtwState,
+          smoothState,
           onDtwState: setDtwState,
+          onSmoothState: setSmoothState,
           onOverlayChange: setDtwOverlay,
         }),
       ),

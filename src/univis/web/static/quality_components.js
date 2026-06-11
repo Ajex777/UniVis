@@ -13,10 +13,13 @@
     dtw_cost_normalized_p95: "所有 selected episode 的归一化 DTW cost 的 95 分位；用于观察大多数 episode 中较差的一批是否仍可接受。",
     p95_position_error_mean: "先计算每条 episode 自己的 p95 位置误差，再对这些 p95 值取平均，单位是米。",
     p95_rotation_error_deg_mean: "先计算每条 episode 自己的 p95 旋转误差，再对这些 p95 值取平均，单位是度。",
+    acceleration_cost: "加速度平滑代价。基于 EEF 位置二阶差分计算，数值越大通常表示动作越急或越抖。",
+    jerk_cost: "Jerk 平滑代价。基于 EEF 位置三阶差分计算，数值越大通常表示轨迹存在突变或不连续。",
   };
 
   function QualityPanel(props) {
     const state = props.dtwState || {};
+    const smoothState = props.smoothState || {};
     const expanded = !!state.expanded;
     const enabled = !!state.enabled;
     const referenceId = state.referenceId || "";
@@ -38,8 +41,13 @@
       setReferenceTrajectory(null);
       setComparison(null);
       setStats(null);
+      props.onSmoothState({ expanded: false, report: null, message: "" });
       props.onOverlayChange(null);
     }, [props.sourceRevision]);
+
+    useEffect(() => {
+      props.onSmoothState({ ...smoothState, report: null, message: "" });
+    }, [props.episodeId, props.sourceRevision]);
 
     useEffect(() => {
       if (!enabled || !referenceId || !props.episodeId) {
@@ -86,6 +94,20 @@
       }
     }
 
+    async function assessSmoothness() {
+      if (!props.episodeId) return;
+      try {
+        const report = await QualityIO.assessSmoothness(props.episodeId);
+        props.onSmoothState({
+          ...smoothState,
+          report,
+          message: report.passed ? "Smooth passed" : "Smooth warning",
+        });
+      } catch (error) {
+        props.onSmoothState({ ...smoothState, report: null, message: error.message });
+      }
+    }
+
     const headerText = !enabled ? "DTW · 未启用" : `DTW · ${referenceLabel}`;
     return h(React.Fragment, null,
       h("div", { className: "quality-card" },
@@ -113,6 +135,20 @@
             disabled: !referenceId || !props.selectedIds.size,
           }, props.selectedIds.size ? `Compute selected stats (${props.selectedIds.size})` : "Compute selected stats"),
           message ? h("p", { className: "quality-message" }, message) : null,
+        ) : null,
+      ),
+      h("div", { className: "quality-card" },
+        h("button", {
+          className: "quality-header",
+          onClick: () => props.onSmoothState({ ...smoothState, expanded: !smoothState.expanded }),
+        },
+          h("strong", null, smoothState.report ? `Smooth · ${smoothState.report.passed ? "Passed" : "Warning"}` : "Smooth"),
+          h("span", null, smoothState.expanded ? "Collapse" : "Expand"),
+        ),
+        smoothState.expanded ? h("div", { className: "quality-body" },
+          h("button", { className: "primary", onClick: assessSmoothness, disabled: !props.episodeId }, "Assess current"),
+          smoothState.message ? h("p", { className: "quality-message" }, smoothState.message) : null,
+          smoothState.report ? h(SmoothnessReport, { report: smoothState.report }) : null,
         ) : null,
       ),
       enabled && comparison ? h(DTWMetricsPopup, { comparison, currentTitle: props.currentTitle, referenceTitle }) : null,
@@ -182,6 +218,22 @@
       h(MetricItem, { label: "DTW p95", value: formatMaybe(summary.dtw_cost_normalized_p95, 3), helpKey: "dtw_cost_normalized_p95" }),
       h(MetricItem, { label: "pos p95 mean", value: formatMaybe(summary.p95_position_error_mean, 4), helpKey: "p95_position_error_mean" }),
       h(MetricItem, { label: "rot p95 mean", value: `${formatMaybe(summary.p95_rotation_error_deg_mean, 2)}°`, helpKey: "p95_rotation_error_deg_mean" }),
+    );
+  }
+
+  function SmoothnessReport({ report }) {
+    const scopes = Object.entries(report.scopes || {});
+    return h("div", { className: "smooth-report" },
+      scopes.map(([name, summary]) =>
+        h("div", { key: name, className: "metric-block smooth-scope" },
+          h("strong", null, `${name} · ${summary.passed ? "passed" : "warning"}`),
+          h(MetricItem, { label: "acc cost", value: summary.acceleration_cost.toFixed(3), helpKey: "acceleration_cost" }),
+          h(MetricItem, { label: "jerk cost", value: summary.jerk_cost.toFixed(3), helpKey: "jerk_cost" }),
+          h(MetricItem, { label: "max acc", value: summary.max_acceleration.toFixed(3), helpKey: "acceleration_cost" }),
+          h(MetricItem, { label: "max jerk", value: summary.max_jerk.toFixed(3), helpKey: "jerk_cost" }),
+          summary.warnings?.length ? h("p", { className: "quality-message smooth-warning" }, summary.warnings.join("; ")) : null,
+        ),
+      ),
     );
   }
 
