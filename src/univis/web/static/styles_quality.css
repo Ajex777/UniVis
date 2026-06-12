@@ -35,10 +35,11 @@
   font-size: 13px;
 }
 
-.dtw-popup {
+.quality-popup {
   position: fixed;
   z-index: 30;
   width: 360px;
+  overflow: visible;
   padding: 12px;
   border: 1px solid var(--line);
   border-radius: 10px;
@@ -46,6 +47,10 @@
   box-shadow: 0 20px 60px rgba(20, 40, 50, 0.18);
   cursor: move;
   pointer-events: auto;
+}
+
+.smooth-popup {
+  width: 380px;
 }
 
 .metric-block {
