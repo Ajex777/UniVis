@@ -15,10 +15,10 @@ from uuid import uuid4
 
 from pydantic import BaseModel, Field
 
-from univis.adapters.base import EpisodeSource, RawEpisodeAdapter
+from univis.base_io.adapters import EpisodeSource, RawEpisodeAdapter
 from univis.core.episode_session import EpisodeSession
 from univis.domain.policy_episode import PolicyEpisode, PolicyEpisodeMetadata
-from univis.exporters.base import EpisodeExporter, ExportResult
+from univis.base_io.exporters import EpisodeExporter, ExportResult
 from univis.utils.json_io import write_json
 
 

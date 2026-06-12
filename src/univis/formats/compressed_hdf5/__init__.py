@@ -6,8 +6,10 @@ from univis.core.components import ComponentBundle
 from univis.formats.compressed_hdf5.adapter import HDF5EpisodeAdapter
 from univis.formats.compressed_hdf5.exporter import HDF5EpisodeExporter
 
+FORMAT_ORDER = 10
 
-def compressed_hdf5_components() -> ComponentBundle:
+
+def format_components() -> ComponentBundle:
     """Return adapter/exporter instances owned by this format package."""
 
     return ComponentBundle(
@@ -16,4 +18,4 @@ def compressed_hdf5_components() -> ComponentBundle:
     )
 
 
-__all__ = ["HDF5EpisodeAdapter", "HDF5EpisodeExporter", "compressed_hdf5_components"]
+__all__ = ["FORMAT_ORDER", "HDF5EpisodeAdapter", "HDF5EpisodeExporter", "format_components"]

@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-from univis.adapters.base import (
+from univis.base_io.adapters import (
     EpisodeSource,
     ImageFrame,
     RawEpisodeAdapter,

@@ -20,7 +20,6 @@ from univis.core.conversions import ConversionService
 from univis.core.episode_session import EpisodeSession
 from univis.core.uploads import UploadManager
 from univis.core.workspaces import WorkspaceManager
-from univis.exporters.mock import MockEpisodeExporter
 from univis.formats import load_format_components
 from univis.preprocessors import load_preprocessors
 from univis.quality import DTWTrajectoryQualityBackend, SmoothnessTrajectoryQualityBackend
@@ -63,7 +62,7 @@ class UniVisAppContext:
             adapters=self.adapters,
             default_adapter_name=self.adapters[0].info().name,
         )
-        self.exporters = format_components.output_exporters + [MockEpisodeExporter()]
+        self.exporters = format_components.output_exporters
         self.preprocessors = load_preprocessors()
         self.preprocessor_map = {pp.info().name: pp for pp in self.preprocessors}
         self.quality_backends = [

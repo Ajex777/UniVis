@@ -6,7 +6,7 @@ from pathlib import Path
 
 import numpy as np
 
-from univis.adapters.base import EpisodeSource, ImageFrame, RawEpisodeAdapter, SourceValidation
+from univis.base_io.adapters import EpisodeSource, ImageFrame, RawEpisodeAdapter, SourceValidation
 from univis.formats.pika_raw.settings import PikaRawFormatConfig
 from univis.formats.pika_raw.manifest import (
     collect_pika_episode_dirs,

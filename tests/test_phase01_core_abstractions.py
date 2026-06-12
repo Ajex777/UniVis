@@ -5,7 +5,8 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from univis.adapters.base import EpisodeSource, RawEpisodeAdapter
+from univis.base_io.adapters import EpisodeSource, RawEpisodeAdapter
+from univis.base_io.exporters import EpisodeExporter, ExportResult
 from univis.core.components import ComponentRegistry
 from univis.domain.policy_episode import (
     Annotation,
@@ -16,7 +17,6 @@ from univis.domain.policy_episode import (
     PolicyFrame,
     ReachabilityOverlay,
 )
-from univis.exporters.mock import MockEpisodeExporter
 from univis.reachability.mock import MockReachabilityBackend
 
 
@@ -38,6 +38,29 @@ class InlineEpisodeAdapter(RawEpisodeAdapter):
 
     def load_episode(self, episode_id: str, source: EpisodeSource | None = None):
         return PolicyEpisode(metadata=_metadata(), frames=[_frame(0), _frame(1)])
+
+
+class InlineEpisodeExporter(EpisodeExporter):
+    """Small concrete exporter used only for abstraction tests."""
+
+    @classmethod
+    def info(cls):
+        from univis.core.components import ComponentInfo
+
+        return ComponentInfo(
+            name="InlineEpisodeExporter",
+            label="Inline Exporter",
+            description="Test-only exporter that reports a logical output path.",
+        )
+
+    def export(self, episode: PolicyEpisode, output_root: Path) -> ExportResult:
+        return ExportResult(
+            episode_id=episode.metadata.episode_id,
+            exporter_name=self.info().name,
+            output_path=str(output_root / f"{episode.metadata.episode_id}.inline.json"),
+            success=True,
+            message=f"validated {episode.metadata.num_frames} frames",
+        )
 
 
 def _frame(index: int) -> PolicyFrame:
@@ -133,7 +156,7 @@ def test_metadata_validates_camera_and_reachability_shape() -> None:
         )
 
 
-def test_mock_adapter_exporter_reachability_flow(tmp_path: Path) -> None:
+def test_inline_adapter_exporter_reachability_flow(tmp_path: Path) -> None:
     """Verify RawEpisodeAdapter -> PolicyEpisode -> EpisodeExporter flow.
 
     Inputs:
@@ -147,12 +170,12 @@ def test_mock_adapter_exporter_reachability_flow(tmp_path: Path) -> None:
     episode = adapter.load_episode(metadata[0].episode_id)
 
     report = MockReachabilityBackend().evaluate(episode)
-    result = MockEpisodeExporter().export(episode, tmp_path)
+    result = InlineEpisodeExporter().export(episode, tmp_path)
 
     assert report.episode_id == episode.metadata.episode_id
     assert report.summary["num_frames"] == episode.metadata.num_frames
     assert result.success is True
-    assert result.output_path.endswith(".mock.json")
+    assert result.output_path.endswith(".inline.json")
 
 
 def test_component_registry_payload() -> None:
@@ -166,10 +189,10 @@ def test_component_registry_payload() -> None:
 
     registry = ComponentRegistry(
         input_adapters=[InlineEpisodeAdapter()],
-        output_exporters=[MockEpisodeExporter()],
+        output_exporters=[InlineEpisodeExporter()],
         reachability_backends=[MockReachabilityBackend()],
     )
     payload = registry.api_payload()
     assert payload["input_adapters"][0]["name"] == "InlineEpisodeAdapter"
-    assert payload["output_exporters"][0]["name"] == "MockEpisodeExporter"
+    assert payload["output_exporters"][0]["name"] == "InlineEpisodeExporter"
     assert payload["reachability_backends"][0]["name"] == "MockReachabilityBackend"

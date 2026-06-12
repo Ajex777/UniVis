@@ -1,0 +1,23 @@
+# Structured config example for a UniVis format.
+#
+# Copy this file into a real format package when behavior should be configured
+# without hard-coding constants in adapter/exporter code.
+
+format:
+  name: template
+  version: 1
+
+input:
+  episode_pattern: "episode*"
+  strict_validation: true
+
+sync:
+  fps: 10.0
+  max_timestamp_delta_sec: 0.05
+
+images:
+  enabled: false
+  cameras: []
+
+export:
+  overwrite: false

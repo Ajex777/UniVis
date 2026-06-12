@@ -7,7 +7,7 @@ import h5py
 import numpy as np
 from PIL import Image
 
-from univis.adapters.base import ImageFrame
+from univis.base_io.adapters import ImageFrame
 from univis.domain.policy_episode import (
     Annotation,
     ArmFrame,

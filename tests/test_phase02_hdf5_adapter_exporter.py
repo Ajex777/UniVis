@@ -8,10 +8,10 @@ import pytest
 from fastapi.testclient import TestClient
 from PIL import Image
 
-from univis.adapters.base import EpisodeSource
-from univis.adapters.hdf5 import HDF5EpisodeAdapter
+from univis.base_io.adapters import EpisodeSource
+from univis.formats.compressed_hdf5.adapter import HDF5EpisodeAdapter
 from univis.app import create_app
-from univis.exporters.hdf5 import HDF5EpisodeExporter
+from univis.formats.compressed_hdf5.exporter import HDF5EpisodeExporter
 from univis.utils.hdf5_episode import frames_to_qpos
 from hdf5_fixtures import export_compressed_hdf5, make_episode, write_script_hdf5
 

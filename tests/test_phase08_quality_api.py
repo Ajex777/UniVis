@@ -3,7 +3,7 @@
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from univis.adapters.base import EpisodeSource, RawEpisodeAdapter
+from univis.base_io.adapters import EpisodeSource, RawEpisodeAdapter
 from univis.api.quality import QualityRouter
 from univis.core.components import ComponentInfo
 from univis.core.episode_session import EpisodeSession

@@ -8,7 +8,7 @@ from pathlib import Path
 import h5py
 import numpy as np
 
-from univis.adapters.base import EpisodeSource, ImageFrame, RawEpisodeAdapter, SourceValidation
+from univis.base_io.adapters import EpisodeSource, ImageFrame, RawEpisodeAdapter, SourceValidation
 from univis.core.components import ComponentInfo
 from univis.domain.policy_episode import Annotation, PolicyEpisode, PolicyEpisodeMetadata, ReachabilityOverlay
 from univis.formats.compressed_hdf5.schema import (
