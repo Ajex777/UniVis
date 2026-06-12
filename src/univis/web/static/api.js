@@ -10,7 +10,13 @@
       let detail = `${response.status} ${response.statusText}`;
       try {
         const payload = await response.json();
-        detail = payload.detail || detail;
+        if (payload.detail && typeof payload.detail === "object") {
+          console.error("UniVis API error", payload.detail);
+          detail = payload.detail.message || detail;
+        } else {
+          console.error("UniVis API error", payload);
+          detail = payload.detail || detail;
+        }
       } catch (_error) {
         detail = `${response.status} ${response.statusText}`;
       }
