@@ -9,7 +9,7 @@ UniVis 是一个面向双臂具身操作的本地优先 Web 可视化、审查�
 UniVis 旨在可视化以及处理所有基于双臂 End Effector 的数据，任意输入格式的数据都应该能轻易地被添加到 UniVis 中并复用现成的可视化与处理 pipeline。目前支持的数据 pipeline 为：
 
 1. 本体数据选择：选择一个本机数据目录。
-2. 选择输入数据格式：如 PIKA raw、compressed HDF5、LeRobot v3。
+2. 选择输入数据格式：如 PIKA raw、compressed HDF5、LeRobot v3、Dexforce W1 Teleop。
 3. 可视化数据检查：在网页中逐条查看图像、轨迹、夹爪状态，以及数据质量。
 4. 数据语言标注：对于raw data，给 episode 写入语言标注、接受或拒绝审查结果。
 5. 数据预处理：在导出时应用选中的数据预处理操作。
@@ -32,6 +32,14 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 ```bash
 uv sync --extra dev
 ```
+
+如果需要可视化 Dexforce W1 遥操数据，并使用本地 FK 将全身 `qpos` 转换为双臂 EEF pose，还需要安装 W1 FK 可选依赖：
+
+```bash
+uv sync --extra dev --extra w1-fk
+```
+
+`w1-fk` 会额外安装 `torch` 与 `pytorch-kinematics==0.7.6`。如果只查看 PIKA raw、HDF5 或 LeRobot v3 数据，不需要安装这个 extra。
 
 ## 三、启动
 
@@ -60,6 +68,17 @@ http://127.0.0.1:8010
 <img src="images/conversion.png" alt="output 决定导出路径" width="500">
 
 如果不指定 `--output`，默认导出到项目目录下的 `.univis/exports`。
+
+如果已安装 W1 FK 可选依赖，启动命令仍然相同：
+
+```bash
+uv run --extra w1-fk univis \
+  --port 8010 \
+  --workspace w1=/path/to/w1_teleop_data \
+  --output /path/to/output
+```
+
+W1 FK 的默认配置位于 `src/univis/formats/dexforce_w1_teleop/config/default.yaml`。其中 `has_waist`、URDF 路径、关节名称、相机规则等均可按部署环境调整。
 
 ## 四、基本使用方法
 
@@ -127,9 +146,29 @@ http://127.0.0.1:8010
 
     <img src="images/dtw_stats.png" alt="DTW stats" width="600">
 
-**进阶设置**:可以在 `UniVis/src/univis/quality/config/dtw/default.yaml` 中设置 dtw 参数
+**进阶设置**:可以在 `src/univis/quality/dtw/config/default.yaml` 中设置 dtw 参数。
 
-### 4.3 补充标注/补充后处理
+### 4.3 Dexforce W1 遥操数据可视化
+
+Dexforce W1 Teleop 格式读取的是全身 `qpos` 遥操数据。UniVis 会先按相机时间戳同步数据，再通过 W1 FK 工具计算左右 EEF pose，最终仍然转换成统一的 `PolicyEpisode` 用于网页可视化和质量检测。
+
+使用前请确认：
+
+1. 已安装 W1 FK extra：`uv sync --extra dev --extra w1-fk`。
+2. `src/univis/formats/dexforce_w1_teleop/config/default.yaml` 中的 `urdf_path` 指向本机存在的 W1 URDF。
+3. `has_waist` 与当前数据的 FK 坐标系需求一致。
+
+启动示例：
+
+```bash
+uv run --extra w1-fk univis \
+  --workspace w1=/path/to/dexforce_w1_teleop_root \
+  --output /path/to/output
+```
+
+进入网页后，将 Input format 选择为 `Dexforce W1 Teleop`，再在对应 workspace 中选择数据目录即可。
+
+### 4.4 补充标注/补充后处理
 
 UniVis 支持以 HDF5 格式为输入，并继续以 HDF5 格式输出，因此可以实现增量修改。使用方式和 4.1 基本一致，只需要将输入格式替换为 HDF5，并找到需要处理的 HDF5 目录即可。
 
@@ -152,13 +191,61 @@ node --check src/univis/web/static/conversion_components.js
 
 `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1` 用于避免系统里的无关 pytest 插件影响当前项目。
 
-## 可扩展性
+### 扩展输入/输出 Format
 
-UniVis 的扩展点尽量围绕抽象类组织：
+新增 format 时，不需要修改 `univis.formats.__init__` 或 `app.py`。推荐从模板目录开始：
 
-- 新输入格式：实现一个新的 `RawEpisodeAdapter`，把自定义 raw data、HDF5、视频数据或其他基于 EEF pose 的数据映射成 `PolicyEpisode`。
-- 新输出格式：实现一个新的 `EpisodeExporter`，把 `PolicyEpisode` 导出成 HDF5、LeRobot 或其他训练格式。
-- 新预处理：实现 preprocessor，在导出前对 episode 或图像读取器做动作 masking、图像 masking、裁剪等处理。
-- 新可达性后端：实现 `ReachabilityBackend`，可以先接 dexechain IK，未来再替换为独立 IK backend。
+```text
+src/univis/formats/template/
+```
 
-因此，长期目标是让 UniVis 逐渐成为独立于特定本体、特定框架的数据审查与转换工具。输入格式、导出格式、预处理和 IK 都可以作为插件式模块逐步替换，而网页交互层保持稳定。
+复制为新的 format 包后，至少需要完成：
+
+1. 将 `__init__.py.sample` 改名为 `__init__.py`。
+2. 实现自己的 `RawEpisodeAdapter`，负责把外部数据源读成 `PolicyEpisode`。
+3. 如果支持导出，实现自己的 `EpisodeExporter`。
+4. 在 `format_components()` 中返回 adapter/exporter 实例。
+5. 如果有格式特有参数，放在该 format 自己的 `config/default.yaml` 中。
+
+真实 format 包只要暴露：
+
+```python
+def format_components() -> ComponentBundle:
+    return ComponentBundle(
+        input_adapters=[MyEpisodeAdapter()],
+        output_exporters=[MyEpisodeExporter()],
+    )
+```
+
+启动时 UniVis 会自动扫描 `src/univis/formats/*`，所有暴露 `format_components()` 的包都会进入 UI 下拉框和 CLI registry。
+
+### 扩展 Quality 功能
+
+新增质量检测功能同样不需要修改顶层 API。推荐从模板目录开始：
+
+```text
+src/univis/quality/template/
+```
+
+复制为新的 quality 包后，至少需要完成：
+
+1. 将 `__init__.py.sample` 改名为 `__init__.py`。
+2. 根据功能类型选择 backend 能力：
+   - `PairwiseQualityBackend`：当前 episode 与 reference episode 对比，例如 DTW。
+   - `ReferenceBatchQualityBackend`：多条 episode 相对同一个 reference 的统计。
+   - `SingleEpisodeQualityBackend`：单条 episode 独立评估，例如 Smooth。
+3. 如果需要 Web API，在该功能自己的 `routes.py` 中实现 route builder。
+4. 在 `quality_components()` 中返回 backend 和 route builder。
+5. 如果有算法参数，放在该 quality 功能自己的 `config/default.yaml` 中。
+
+真实 quality 包只要暴露：
+
+```python
+def quality_components() -> QualityComponentBundle:
+    return QualityComponentBundle(
+        backends=[MyQualityBackend()],
+        route_builders=[build_my_quality_router],
+    )
+```
+
+启动时 UniVis 会自动扫描 `src/univis/quality/*`，所有暴露 `quality_components()` 的包都会进入 `/api/quality/backends`，并自动挂载自己的 `/api/quality/<feature>/...` 路由。
