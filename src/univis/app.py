@@ -20,10 +20,9 @@ from univis.core.conversions import ConversionService
 from univis.core.episode_session import EpisodeSession
 from univis.core.uploads import UploadManager
 from univis.core.workspaces import WorkspaceManager
-from univis.exporters.mock import MockEpisodeExporter
 from univis.formats import load_format_components
 from univis.preprocessors import load_preprocessors
-from univis.quality import DTWTrajectoryQualityBackend
+from univis.quality import load_quality_components
 from univis.reachability.mock import MockReachabilityBackend
 
 
@@ -63,10 +62,12 @@ class UniVisAppContext:
             adapters=self.adapters,
             default_adapter_name=self.adapters[0].info().name,
         )
-        self.exporters = format_components.output_exporters + [MockEpisodeExporter()]
+        self.exporters = format_components.output_exporters
         self.preprocessors = load_preprocessors()
         self.preprocessor_map = {pp.info().name: pp for pp in self.preprocessors}
-        self.quality_backends = [DTWTrajectoryQualityBackend()]
+        quality_components = load_quality_components()
+        self.quality_backends = quality_components.backends
+        self.quality_route_builders = quality_components.route_builders
         self.registry = ComponentRegistry(
             input_adapters=self.adapters,
             output_exporters=self.exporters,
@@ -97,7 +98,13 @@ class UniVisAppContext:
         app.include_router(UploadRouter(self.upload_manager, self.session).router)
         app.include_router(WorkspaceRouter(self.workspace_manager, self.session).router)
         app.include_router(ConversionRouter(self.conversion_service).router)
-        app.include_router(QualityRouter(self.session, self.quality_backends).router)
+        app.include_router(
+            QualityRouter(
+                self.session,
+                self.quality_backends,
+                self.quality_route_builders,
+            ).router
+        )
         app.mount("/static", StaticFiles(directory=str(self.static_dir)), name="static")
 
         @app.get("/", include_in_schema=False)

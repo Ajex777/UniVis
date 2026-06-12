@@ -1,1 +1,0 @@
-"""Episode adapter implementations."""

@@ -1,0 +1,49 @@
+"""Template package for a new UniVis format.
+
+Copy this file to `__init__.py` in a real format package and replace the sample
+classes with concrete implementations.
+
+This file is the only registration surface a normal format package needs. The
+global `univis.formats` loader scans subpackages and calls `format_components()`
+automatically, so adding a new format should not require editing app or CLI code.
+"""
+
+from __future__ import annotations
+
+from univis.core.components import ComponentBundle
+from univis.formats.template.adapter import TemplateEpisodeAdapter
+from univis.formats.template.exporter import TemplateEpisodeExporter
+
+FORMAT_ORDER = 100
+"""Optional UI/CLI ordering hint.
+
+Lower values appear earlier in registry output. If this field is missing, the
+format is still usable, but it will be ordered after explicitly ranked formats.
+Use this when a format should be the default or should appear near related
+formats.
+"""
+
+
+def format_components() -> ComponentBundle:
+    """Return adapter/exporter instances owned by this format package.
+
+    Inputs:
+        None. The function is called by auto-discovery during application or CLI
+        startup.
+    Output:
+        `ComponentBundle` containing this format's adapters and exporters.
+
+    Missing components:
+        If the format only supports reading, leave `output_exporters=[]`.
+        If the format only supports writing, leave `input_adapters=[]`.
+        If this function itself is missing, the package will be ignored by
+        auto-discovery and will not appear in UI/CLI registries.
+    """
+
+    return ComponentBundle(
+        input_adapters=[TemplateEpisodeAdapter()],
+        output_exporters=[TemplateEpisodeExporter()],
+    )
+
+
+__all__ = ["FORMAT_ORDER", "TemplateEpisodeAdapter", "TemplateEpisodeExporter", "format_components"]

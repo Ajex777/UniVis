@@ -7,6 +7,7 @@ import base64
 from pydantic import BaseModel
 from fastapi import APIRouter, HTTPException, Query, Response
 
+from univis.api.errors import bad_request
 from univis.core.components import ComponentRegistry
 from univis.core.episode_session import EpisodeSession
 from univis.domain.policy_episode import Annotation
@@ -68,7 +69,7 @@ class Phase00Router:
         try:
             items = self.session.list_episodes()
         except Exception as exc:
-            raise HTTPException(status_code=400, detail=str(exc)) from exc
+            raise bad_request(exc) from exc
         return items
 
     def get_registry(self) -> dict:
@@ -83,7 +84,7 @@ class Phase00Router:
             source = self.session.set_source(request.input_adapter, root_path)
             episodes = self.session.list_episodes()
         except Exception as exc:
-            raise HTTPException(status_code=400, detail=str(exc)) from exc
+            raise bad_request(exc) from exc
         return {"source": source, "episodes": episodes}
 
     def validate_source(self, request: SourceSelectionRequest) -> dict:
@@ -93,7 +94,7 @@ class Phase00Router:
         try:
             return self.session.validate_source(request.input_adapter, root_path)
         except Exception as exc:
-            raise HTTPException(status_code=400, detail=str(exc)) from exc
+            raise bad_request(exc) from exc
 
     def get_metadata(self, episode_id: str) -> dict:
         """Return metadata for a selected episode."""
@@ -102,7 +103,7 @@ class Phase00Router:
         except KeyError as exc:
             raise HTTPException(status_code=404, detail="episode not found") from exc
         except Exception as exc:
-            raise HTTPException(status_code=400, detail=str(exc)) from exc
+            raise bad_request(exc) from exc
 
     def get_trajectory(self, episode_id: str) -> dict:
         """Return synchronized trajectory arrays for visualization."""
@@ -111,7 +112,7 @@ class Phase00Router:
         except KeyError as exc:
             raise HTTPException(status_code=404, detail="episode not found") from exc
         except Exception as exc:
-            raise HTTPException(status_code=400, detail=str(exc)) from exc
+            raise bad_request(exc) from exc
 
         frames = episode.frames
         return {
@@ -134,7 +135,7 @@ class Phase00Router:
         except KeyError as exc:
             raise HTTPException(status_code=404, detail="episode not found") from exc
         except Exception as exc:
-            raise HTTPException(status_code=400, detail=str(exc)) from exc
+            raise bad_request(exc) from exc
         return saved.model_dump()
 
     def batch_update_annotation(self, request: BatchAnnotationRequest) -> dict:
@@ -169,7 +170,7 @@ class Phase00Router:
         except KeyError as exc:
             raise HTTPException(status_code=404, detail="episode not found") from exc
         except Exception as exc:
-            raise HTTPException(status_code=400, detail=str(exc)) from exc
+            raise bad_request(exc) from exc
 
         camera = next((cam for cam in meta.cameras if cam.key == camera_key), None)
         if camera is None:
@@ -179,7 +180,7 @@ class Phase00Router:
         try:
             image = self.session.get_image_frame(episode_id, camera_key, idx)
         except Exception as exc:
-            raise HTTPException(status_code=400, detail=str(exc)) from exc
+            raise bad_request(exc) from exc
         return Response(
             content=image.data,
             media_type=image.media_type,
@@ -200,7 +201,7 @@ class Phase00Router:
         except KeyError as exc:
             raise HTTPException(status_code=404, detail="episode not found") from exc
         except Exception as exc:
-            raise HTTPException(status_code=400, detail=str(exc)) from exc
+            raise bad_request(exc) from exc
 
         camera = next((cam for cam in meta.cameras if cam.key == camera_key), None)
         if camera is None:
@@ -213,7 +214,7 @@ class Phase00Router:
                 episode_id, camera_key, start_idx, batch_count
             )
         except Exception as exc:
-            raise HTTPException(status_code=400, detail=str(exc)) from exc
+            raise bad_request(exc) from exc
         return {
             "episode_id": episode_id,
             "camera_key": camera_key,

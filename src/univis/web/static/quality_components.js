@@ -3,9 +3,11 @@
   const { useEffect, useMemo, useRef, useState } = React;
   const QualityIO = window.UniVisQualityIO;
   const { fetchJson } = window.UniVisApi;
+  const { DTWMetricsPopup, SelectedStatsPopup, SmoothMetricsPopup } = window.UniVisQualityPopups;
 
   function QualityPanel(props) {
     const state = props.dtwState || {};
+    const smoothState = props.smoothState || {};
     const expanded = !!state.expanded;
     const enabled = !!state.enabled;
     const referenceId = state.referenceId || "";
@@ -27,8 +29,13 @@
       setReferenceTrajectory(null);
       setComparison(null);
       setStats(null);
+      props.onSmoothState({ expanded: false, report: null, message: "" });
       props.onOverlayChange(null);
     }, [props.sourceRevision]);
+
+    useEffect(() => {
+      props.onSmoothState({ ...smoothState, report: null, message: "" });
+    }, [props.episodeId, props.sourceRevision]);
 
     useEffect(() => {
       if (!enabled || !referenceId || !props.episodeId) {
@@ -75,6 +82,20 @@
       }
     }
 
+    async function assessSmoothness() {
+      if (!props.episodeId) return;
+      try {
+        const report = await QualityIO.assessSmoothness(props.episodeId);
+        props.onSmoothState({
+          ...smoothState,
+          report,
+          message: report.passed ? "Smooth passed" : "Smooth warning",
+        });
+      } catch (error) {
+        props.onSmoothState({ ...smoothState, report: null, message: error.message });
+      }
+    }
+
     const headerText = !enabled ? "DTW · 未启用" : `DTW · ${referenceLabel}`;
     return h(React.Fragment, null,
       h("div", { className: "quality-card" },
@@ -104,79 +125,23 @@
           message ? h("p", { className: "quality-message" }, message) : null,
         ) : null,
       ),
+      h("div", { className: "quality-card" },
+        h("button", {
+          className: "quality-header",
+          onClick: () => props.onSmoothState({ ...smoothState, expanded: !smoothState.expanded }),
+        },
+          h("strong", null, smoothState.report ? `Smooth · ${smoothState.report.passed ? "Passed" : "Warning"}` : "Smooth"),
+          h("span", null, smoothState.expanded ? "Collapse" : "Expand"),
+        ),
+        smoothState.expanded ? h("div", { className: "quality-body" },
+          h("button", { className: "primary", onClick: assessSmoothness, disabled: !props.episodeId }, "Assess current"),
+          smoothState.message ? h("p", { className: "quality-message" }, smoothState.message) : null,
+        ) : null,
+      ),
       enabled && comparison ? h(DTWMetricsPopup, { comparison, currentTitle: props.currentTitle, referenceTitle }) : null,
+      smoothState.report ? h(SmoothMetricsPopup, { report: smoothState.report }) : null,
       stats ? h(SelectedStatsPopup, { stats, onClose: () => setStats(null) }) : null,
     );
-  }
-
-  function DTWMetricsPopup({ comparison, currentTitle, referenceTitle }) {
-    const [pos, setPos] = useState({ x: 420, y: 18 });
-    return h("div", {
-      className: "dtw-popup",
-      style: { left: pos.x, top: pos.y },
-      onMouseDown: (event) => startDrag(event, pos, setPos),
-    },
-      h("strong", null, "DTW Metrics"),
-      h("p", { className: "meta" }, `${currentTitle || comparison.current_episode_id} vs ${referenceTitle || comparison.reference_episode_id}`),
-      h(MetricBlock, { title: "Left", summary: comparison.left.summary }),
-      h(MetricBlock, { title: "Right", summary: comparison.right.summary }),
-    );
-  }
-
-  function MetricBlock({ title, summary }) {
-    return h("div", { className: "metric-block" },
-      h("strong", null, title),
-      h("span", null, `DTW ${summary.dtw_cost_normalized.toFixed(3)}`),
-      h("span", null, `pos mean ${summary.mean_position_error.toFixed(4)}`),
-      h("span", null, `pos p95 ${summary.p95_position_error.toFixed(4)}`),
-      h("span", null, `rot mean ${summary.mean_rotation_error_deg.toFixed(2)}°`),
-      h("span", null, `warp ${summary.warp_distortion.toFixed(3)}`),
-    );
-  }
-
-  function SelectedStatsPopup({ stats, onClose }) {
-    return h("div", { className: "stats-modal" },
-      h("div", { className: "stats-box" },
-        h("div", { className: "record-line" },
-          h("strong", null, "Selected DTW Stats"),
-          h("button", { className: "ghost", onClick: onClose }, "Close"),
-        ),
-        h("p", { className: "meta" }, `Reference: ${stats.reference_episode_id}`),
-        h(StatsSummary, { title: "Left", summary: stats.left_summary }),
-        h(StatsSummary, { title: "Right", summary: stats.right_summary }),
-        h("strong", null, "Top abnormal"),
-        stats.abnormal_episodes.map((item) =>
-          h("p", { key: item.episode_id, className: "meta" },
-            `${item.episode_id}: L ${item.left_dtw_cost_normalized.toFixed(3)} / R ${item.right_dtw_cost_normalized.toFixed(3)}`,
-          ),
-        ),
-      ),
-    );
-  }
-
-  function StatsSummary({ title, summary }) {
-    return h("div", { className: "metric-block" },
-      h("strong", null, title),
-      h("span", null, `DTW mean ${summary.dtw_cost_normalized_mean?.toFixed(3) || "n/a"}`),
-      h("span", null, `DTW p95 ${summary.dtw_cost_normalized_p95?.toFixed(3) || "n/a"}`),
-      h("span", null, `pos p95 mean ${summary.p95_position_error_mean?.toFixed(4) || "n/a"}`),
-      h("span", null, `rot p95 mean ${summary.p95_rotation_error_deg_mean?.toFixed(2) || "n/a"}°`),
-    );
-  }
-
-  function startDrag(event, pos, setPos) {
-    if (event.target.tagName === "BUTTON") return;
-    const startX = event.clientX;
-    const startY = event.clientY;
-    function move(moveEvent) {
-      setPos({ x: pos.x + moveEvent.clientX - startX, y: pos.y + moveEvent.clientY - startY });
-    }
-    function stop() {
-      window.removeEventListener("mousemove", move);
-      window.removeEventListener("mouseup", stop);
-    }
-    window.addEventListener("mousemove", move);
-    window.addEventListener("mouseup", stop);
   }
 
   window.UniVisQualityComponents = { QualityPanel };

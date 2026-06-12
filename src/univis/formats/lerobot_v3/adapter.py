@@ -7,7 +7,7 @@ from pathlib import Path
 
 import numpy as np
 
-from univis.adapters.base import EpisodeSource, ImageFrame, RawEpisodeAdapter, SourceValidation
+from univis.base_io.adapters import EpisodeSource, ImageFrame, RawEpisodeAdapter, SourceValidation
 from univis.core.components import ComponentInfo
 from univis.domain.policy_episode import (
     Annotation,
@@ -51,6 +51,7 @@ class LeRobotV3EpisodeAdapter(RawEpisodeAdapter):
         return ComponentInfo(
             name="LeRobotV3EpisodeAdapter",
             label="LeRobot v3",
+            aliases=["LeRobotV3"],
             description="Reads LeRobot v3.0 datasets into PolicyEpisode objects.",
             capabilities={
                 "source": {

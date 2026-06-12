@@ -1,1 +1,0 @@
-"""Packaged quality configuration resources."""

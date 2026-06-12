@@ -1,0 +1,23 @@
+# Default configuration for UniVis DTW trajectory quality checks.
+
+quality:
+  backend: DTWTrajectoryQualityBackend
+  description: Relative dual-arm EEF pose consistency with dynamic time warping.
+
+pose_distance:
+  position:
+    scale_m: 0.01
+  rotation:
+    scale_deg: 5.0
+
+alignment:
+  window:
+    enabled: true
+    ratio: 0.2
+
+visualization:
+  alignment_links:
+    max_count: 120
+
+statistics:
+  percentile: 95.0

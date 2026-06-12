@@ -9,10 +9,10 @@ import h5py
 import numpy as np
 from PIL import Image
 
-from univis.adapters.base import EpisodeSource, RawEpisodeAdapter
+from univis.base_io.adapters import EpisodeSource, RawEpisodeAdapter
 from univis.core.components import ComponentInfo
 from univis.domain.policy_episode import PolicyEpisode
-from univis.exporters.base import EpisodeExporter, ExportResult
+from univis.base_io.exporters import EpisodeExporter, ExportResult
 from univis.formats.compressed_hdf5.codec import DexH5FFmpegCodec, HDF5VideoCodec
 from univis.formats.compressed_hdf5.schema import ACTION, CHUNKS, IMAGES, LANGUAGE_PROMPT, OBSERVATIONS, QPOS, CompressedHDF5Schema
 from univis.utils.hdf5_episode import STRING_DTYPE, frames_to_qpos, json_dumps, write_string_dataset
@@ -51,6 +51,7 @@ class HDF5EpisodeExporter(EpisodeExporter):
         return ComponentInfo(
             name="HDF5EpisodeExporter",
             label="Compressed HDF5",
+            aliases=["HDF5"],
             description="Writes dexechain-compatible compressed HDF5 episode files.",
             capabilities={"format": {"schema": "dexechain_compressed_hdf5"}},
         )

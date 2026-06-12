@@ -1,0 +1,30 @@
+# Default configuration for UniVis single-episode smoothness checks.
+
+smoothness:
+  backend: SmoothnessTrajectoryQualityBackend
+
+time:
+  use_episode_timestamps: true
+  fps_fallback: 30.0
+
+scopes:
+  left_eef_position:
+    enabled: true
+    source: left.xyz
+    acceleration_cost_threshold: 10.0
+    jerk_cost_threshold: 200.0
+  right_eef_position:
+    enabled: true
+    source: right.xyz
+    acceleration_cost_threshold: 10.0
+    jerk_cost_threshold: 200.0
+  left_eef_rotation6d:
+    enabled: false
+    source: left.rot6d
+    acceleration_cost_threshold: 10.0
+    jerk_cost_threshold: 200.0
+  right_eef_rotation6d:
+    enabled: false
+    source: right.rot6d
+    acceleration_cost_threshold: 10.0
+    jerk_cost_threshold: 200.0

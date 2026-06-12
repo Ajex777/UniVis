@@ -8,8 +8,8 @@ from fastapi.testclient import TestClient
 from PIL import Image
 
 from pika_fixtures import write_pika_raw_episode
-from univis.adapters.base import EpisodeSource
-from univis.adapters.hdf5 import HDF5EpisodeAdapter
+from univis.base_io.adapters import EpisodeSource
+from univis.formats.compressed_hdf5.adapter import HDF5EpisodeAdapter
 from univis.app import create_app
 
 

@@ -6,7 +6,7 @@ from io import BytesIO
 
 from PIL import Image
 
-from univis.adapters.base import ImageFrame, RawEpisodeAdapter
+from univis.base_io.adapters import ImageFrame, RawEpisodeAdapter
 from univis.core.components import ComponentInfo
 from univis.domain.policy_episode import PolicyEpisode, PolicyEpisodeMetadata
 from univis.preprocessors.base import EpisodePreprocessor

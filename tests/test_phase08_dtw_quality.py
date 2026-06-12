@@ -11,8 +11,8 @@ from univis.domain.policy_episode import (
     PolicyFrame,
 )
 from univis.quality.dtw import DTWTrajectoryQualityBackend, PoseDTWComparator
-from univis.quality.models import PoseDTWConfig
-from univis.quality.settings import QualityConfig
+from univis.quality.dtw.models import PoseDTWConfig
+from univis.quality.dtw.settings import DTWQualityConfig
 
 
 def _episode(episode_id: str, xs: list[float], right_offset: float = 0.0) -> PolicyEpisode:
@@ -99,7 +99,7 @@ def test_visual_links_are_decimated() -> None:
 def test_default_dtw_config_loads_from_structured_yaml() -> None:
     """Verify packaged structured YAML drives DTW defaults."""
 
-    config = QualityConfig.load().dtw
+    config = DTWQualityConfig.load()
     assert config.pos_scale == 0.01
     assert config.rot_scale_deg == 5.0
     assert config.window_ratio == 0.2
