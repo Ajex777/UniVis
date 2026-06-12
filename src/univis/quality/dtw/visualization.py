@@ -11,8 +11,8 @@ matplotlib.use("Agg")
 from matplotlib import pyplot as plt  # noqa: E402
 
 from univis.domain.policy_episode import PolicyEpisode
-from univis.quality.extractors import DualArmEEFExtractor
-from univis.quality.models import EpisodeDTWComparison
+from univis.quality.dtw.extractors import DualArmEEFExtractor
+from univis.quality.dtw.models import EpisodeDTWComparison
 
 
 class DTWComparisonPlotter:
@@ -39,16 +39,7 @@ class DTWComparisonPlotter:
         comparison: EpisodeDTWComparison,
         output_path: Path,
     ) -> Path:
-        """Render one static PNG similar to the GUI DTW overlay.
-
-        Inputs:
-            current: Episode currently being evaluated.
-            reference: Expert/reference episode.
-            comparison: DTW comparison result containing visual links.
-            output_path: Destination PNG path.
-        Output:
-            The written PNG path.
-        """
+        """Render one static PNG similar to the GUI DTW overlay."""
 
         current_pose = self.extractor.extract(current)
         reference_pose = self.extractor.extract(reference)
@@ -73,7 +64,12 @@ class DTWComparisonPlotter:
             comparison.right.visual_links,
             self.COLORS["right_links"],
         )
-        self._style_axis(axis, [current_pose.left[:, :3], current_pose.right[:, :3], reference_pose.left[:, :3], reference_pose.right[:, :3]])
+        self._style_axis(axis, [
+            current_pose.left[:, :3],
+            current_pose.right[:, :3],
+            reference_pose.left[:, :3],
+            reference_pose.right[:, :3],
+        ])
         fig.tight_layout()
         fig.savefig(output_path, bbox_inches="tight")
         plt.close(fig)

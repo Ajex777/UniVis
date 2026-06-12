@@ -10,10 +10,10 @@ from typing import Sequence
 
 from univis.core.components import ComponentBundle, ComponentNameResolver
 from univis.core.episode_session import EpisodeSession
-from univis.core.quality_service import QualityService
 from univis.formats import load_format_components
-from univis.quality import DTWTrajectoryQualityBackend
-from univis.quality.visualization import DTWComparisonPlotter
+from univis.quality.dtw import DTWTrajectoryQualityBackend
+from univis.quality.dtw.visualization import DTWComparisonPlotter
+from univis.quality.service import QualityService
 from univis.utils.json_io import write_json
 
 
@@ -63,7 +63,7 @@ class DTWCLI:
         """Run one current-vs-reference DTW comparison."""
 
         service = self._service(args.input_format, args.source)
-        comparison = service.compare_dtw(args.current, args.reference, args.backend)
+        comparison = service.compare(args.current, args.reference, args.backend)
         output_dir = self._output_dir(args.output, args.source, "compare")
         stem = self._compare_stem(args.current, args.reference)
         json_path = output_dir / f"{stem}.json"

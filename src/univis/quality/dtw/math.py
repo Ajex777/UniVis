@@ -8,13 +8,7 @@ import numpy as np
 
 
 def rot6d_to_matrix(rot6d: np.ndarray) -> np.ndarray:
-    """Convert 6D rotation representation to rotation matrices.
-
-    Inputs:
-        rot6d: Array with shape `(..., 6)`.
-    Output:
-        Rotation matrices with shape `(..., 3, 3)`.
-    """
+    """Convert 6D rotation representation to rotation matrices."""
 
     values = np.asarray(rot6d, dtype=np.float64)
     a1 = values[..., 0:3]
@@ -79,6 +73,18 @@ def decimate_path(path: list[tuple[int, int]], max_links: int) -> list[tuple[int
     return [path[int(round(index))] for index in indices]
 
 
+def percentile(values: list[float], q: float) -> float:
+    """Return a percentile as a plain float."""
+
+    return float(np.percentile(np.asarray(values, dtype=np.float64), q))
+
+
+def degrees(values: list[float]) -> list[float]:
+    """Convert radians to degrees for metric reporting."""
+
+    return [math.degrees(value) for value in values]
+
+
 def _safe_normalize(values: np.ndarray) -> np.ndarray:
     """Normalize vectors with fallback for near-zero inputs."""
 
@@ -109,15 +115,3 @@ def _backtrack(cumulative: np.ndarray) -> list[tuple[int, int]]:
         j -= 1
     path.reverse()
     return path
-
-
-def percentile(values: list[float], q: float) -> float:
-    """Return a percentile as a plain float."""
-
-    return float(np.percentile(np.asarray(values, dtype=np.float64), q))
-
-
-def degrees(values: list[float]) -> list[float]:
-    """Convert radians to degrees for metric reporting."""
-
-    return [math.degrees(value) for value in values]

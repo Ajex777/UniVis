@@ -22,7 +22,7 @@ from univis.core.uploads import UploadManager
 from univis.core.workspaces import WorkspaceManager
 from univis.formats import load_format_components
 from univis.preprocessors import load_preprocessors
-from univis.quality import DTWTrajectoryQualityBackend, SmoothnessTrajectoryQualityBackend
+from univis.quality import load_quality_components
 from univis.reachability.mock import MockReachabilityBackend
 
 
@@ -65,10 +65,9 @@ class UniVisAppContext:
         self.exporters = format_components.output_exporters
         self.preprocessors = load_preprocessors()
         self.preprocessor_map = {pp.info().name: pp for pp in self.preprocessors}
-        self.quality_backends = [
-            DTWTrajectoryQualityBackend(),
-            SmoothnessTrajectoryQualityBackend(),
-        ]
+        quality_components = load_quality_components()
+        self.quality_backends = quality_components.backends
+        self.quality_route_builders = quality_components.route_builders
         self.registry = ComponentRegistry(
             input_adapters=self.adapters,
             output_exporters=self.exporters,
@@ -99,7 +98,13 @@ class UniVisAppContext:
         app.include_router(UploadRouter(self.upload_manager, self.session).router)
         app.include_router(WorkspaceRouter(self.workspace_manager, self.session).router)
         app.include_router(ConversionRouter(self.conversion_service).router)
-        app.include_router(QualityRouter(self.session, self.quality_backends).router)
+        app.include_router(
+            QualityRouter(
+                self.session,
+                self.quality_backends,
+                self.quality_route_builders,
+            ).router
+        )
         app.mount("/static", StaticFiles(directory=str(self.static_dir)), name="static")
 
         @app.get("/", include_in_schema=False)

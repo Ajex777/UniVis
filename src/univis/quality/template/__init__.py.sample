@@ -1,0 +1,48 @@
+"""Template package for a new UniVis quality feature.
+
+Copy this file to `__init__.py` in a real quality package and replace the sample
+classes with concrete implementations.
+
+This file is the only registration surface a normal quality package needs. The
+global `univis.quality` loader scans subpackages and calls `quality_components()`
+automatically, so adding a new quality feature should not require editing app or
+top-level API code.
+"""
+
+from __future__ import annotations
+
+from univis.quality.base import QualityComponentBundle
+from univis.quality.template.backend import TemplateQualityBackend
+from univis.quality.template.routes import build_template_quality_router
+
+QUALITY_ORDER = 100
+"""Optional backend/API ordering hint.
+
+Lower values appear earlier in registry output. If this field is missing, the
+feature is still usable, but it will be ordered after explicitly ranked features.
+Use this when a feature should appear near related tools in the UI.
+"""
+
+
+def quality_components() -> QualityComponentBundle:
+    """Return backend and route-builder instances owned by this package.
+
+    Inputs:
+        None. The function is called by auto-discovery during app startup.
+    Output:
+        `QualityComponentBundle` containing this feature's backend instances and
+        route builders.
+
+    Missing components:
+        If this function is missing, the package will be ignored by auto-discovery.
+        If `route_builders` is empty, the backend can still appear in registry
+        payloads but will not add feature-specific API endpoints.
+    """
+
+    return QualityComponentBundle(
+        backends=[TemplateQualityBackend()],
+        route_builders=[build_template_quality_router],
+    )
+
+
+__all__ = ["QUALITY_ORDER", "TemplateQualityBackend", "quality_components"]

@@ -40,3 +40,17 @@ def test_registry_endpoint_lists_real_input_adapters() -> None:
     assert payload["output_exporters"][0]["aliases"] == ["HDF5"]
     assert payload["reachability_backends"][0]["name"] == "MockReachabilityBackend"
     assert payload["quality_backends"][0]["name"] == "DTWTrajectoryQualityBackend"
+    assert payload["quality_backends"][1]["name"] == "SmoothnessTrajectoryQualityBackend"
+
+
+def test_quality_backends_endpoint_uses_discovered_components() -> None:
+    """Verify quality router exposes automatically discovered quality backends."""
+
+    client = TestClient(create_app())
+    response = client.get("/api/quality/backends")
+
+    assert response.status_code == 200
+    assert [item["name"] for item in response.json()] == [
+        "DTWTrajectoryQualityBackend",
+        "SmoothnessTrajectoryQualityBackend",
+    ]

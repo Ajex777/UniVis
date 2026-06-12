@@ -8,8 +8,9 @@ import numpy as np
 
 from univis.core.components import ComponentInfo
 from univis.domain.policy_episode import PolicyEpisode
-from univis.quality.base import TrajectoryQualityBackend
-from univis.quality.dtw_math import (
+from univis.quality.base import PairwiseQualityBackend, ReferenceBatchQualityBackend
+from univis.quality.dtw.extractors import DualArmEEFExtractor
+from univis.quality.dtw.math import (
     compute_dtw,
     decimate_path,
     degrees,
@@ -18,8 +19,7 @@ from univis.quality.dtw_math import (
     rotation_distance_rad,
     warp_distortion,
 )
-from univis.quality.extractors import DualArmEEFExtractor
-from univis.quality.models import (
+from univis.quality.dtw.models import (
     ArmDTWAlignment,
     ArmDTWSummary,
     EpisodeDTWComparison,
@@ -27,7 +27,7 @@ from univis.quality.models import (
     PoseDTWConfig,
     SelectedEpisodeDTWStats,
 )
-from univis.quality.settings import QualityConfig
+from univis.quality.dtw.settings import DTWQualityConfig
 
 
 class PoseDTWComparator:
@@ -98,11 +98,11 @@ class PoseDTWComparator:
         return int(max(len(current), len(reference)) * self.config.window_ratio)
 
 
-class DTWTrajectoryQualityBackend(TrajectoryQualityBackend):
+class DTWTrajectoryQualityBackend(PairwiseQualityBackend, ReferenceBatchQualityBackend):
     """PolicyEpisode quality backend using dual-arm pose DTW."""
 
     def __init__(self, config: PoseDTWConfig | None = None) -> None:
-        self.config = config or QualityConfig.load().dtw
+        self.config = config or DTWQualityConfig.load()
         self.extractor = DualArmEEFExtractor()
         self.comparator = PoseDTWComparator(self.config)
 
@@ -157,6 +157,7 @@ class DTWTrajectoryQualityBackend(TrajectoryQualityBackend):
             right_summary=_aggregate(right_values),
             abnormal_episodes=scores[:10],
         )
+
 
 def _aggregate(summaries: list[ArmDTWSummary]) -> dict[str, float]:
     """Aggregate a list of arm summaries for selected stats."""

@@ -1,4 +1,4 @@
-"""PolicyEpisode trajectory extraction helpers."""
+"""PolicyEpisode trajectory extraction helpers for DTW."""
 
 from __future__ import annotations
 
@@ -11,14 +11,7 @@ from univis.domain.policy_episode import PolicyEpisode
 
 @dataclass(frozen=True)
 class DualArmPoseTrajectories:
-    """Left and right EEF pose trajectories.
-
-    Inputs:
-        left: Array with shape `(T, 9)` containing xyz + rot6d.
-        right: Array with shape `(T, 9)` containing xyz + rot6d.
-    Output:
-        Immutable trajectory pair consumed by DTW comparators.
-    """
+    """Left and right EEF pose trajectories consumed by DTW comparators."""
 
     left: np.ndarray
     right: np.ndarray

@@ -1,0 +1,14 @@
+# Template quality config.
+#
+# Copy this file into a real quality feature and replace these fields with
+# structured parameters that belong to that feature.
+
+quality:
+  backend: TemplateQualityBackend
+  description: Example quality feature config.
+
+single_episode:
+  min_frames: 2
+
+pairwise:
+  max_frame_delta: 10

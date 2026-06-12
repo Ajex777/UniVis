@@ -18,8 +18,8 @@ from univis.domain.policy_episode import (
     PolicyFrame,
 )
 from univis.quality import DTWTrajectoryQualityBackend, SmoothnessTrajectoryQualityBackend
-from univis.quality.models import SmoothnessConfig, SmoothnessScopeConfig
-from univis.quality.settings import QualityConfig
+from univis.quality.smooth.models import SmoothnessConfig, SmoothnessScopeConfig
+from univis.quality.smooth.settings import SmoothnessQualityConfig
 
 
 class SmoothQualityTestAdapter(RawEpisodeAdapter):
@@ -109,7 +109,7 @@ def test_jump_trajectory_fails_smoothness_thresholds() -> None:
 def test_default_smoothness_config_loads() -> None:
     """Verify packaged smoothness defaults are exposed through QualityConfig."""
 
-    config = QualityConfig.load().smoothness
+    config = SmoothnessQualityConfig.load()
     assert config.use_episode_timestamps
     assert config.scopes["left_eef_position"].enabled
     assert not config.scopes["left_eef_rotation6d"].enabled

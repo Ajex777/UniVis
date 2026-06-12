@@ -6,23 +6,25 @@ import numpy as np
 
 from univis.core.components import ComponentInfo
 from univis.domain.policy_episode import PolicyEpisode, PolicyFrame
-from univis.quality.base import TrajectoryQualityBackend
-from univis.quality.models import (
+from univis.quality.base import SingleEpisodeQualityBackend
+from univis.quality.smooth.metrics import (
+    trajectory_smoothness_acceleration,
+    trajectory_smoothness_jerk,
+)
+from univis.quality.smooth.models import (
     ArmSmoothnessSummary,
-    EpisodeDTWComparison,
     EpisodeSmoothnessReport,
-    SelectedEpisodeDTWStats,
     SmoothnessConfig,
     SmoothnessScopeConfig,
 )
-from univis.quality.settings import QualityConfig
+from univis.quality.smooth.settings import SmoothnessQualityConfig
 
 
-class SmoothnessTrajectoryQualityBackend(TrajectoryQualityBackend):
+class SmoothnessTrajectoryQualityBackend(SingleEpisodeQualityBackend):
     """Assess whether one PolicyEpisode has smooth EEF trajectories."""
 
     def __init__(self, config: SmoothnessConfig | None = None) -> None:
-        self.config = config or QualityConfig.load().smoothness
+        self.config = config or SmoothnessQualityConfig.load()
 
     @classmethod
     def info(cls) -> ComponentInfo:
@@ -50,52 +52,14 @@ class SmoothnessTrajectoryQualityBackend(TrajectoryQualityBackend):
             scopes=scopes,
         )
 
-    def compare(
-        self,
-        current: PolicyEpisode,
-        reference: PolicyEpisode,
-    ) -> EpisodeDTWComparison:
-        """Smoothness is reference-free; use `assess` instead."""
-
-        raise NotImplementedError("smoothness quality does not compare against a reference")
-
-    def selected_stats(
-        self,
-        episodes: list[PolicyEpisode],
-        reference: PolicyEpisode,
-    ) -> SelectedEpisodeDTWStats:
-        """Smoothness is reference-free; use `assess` episode-by-episode."""
-
-        raise NotImplementedError("smoothness quality does not aggregate DTW stats")
-
-
-def trajectory_smoothness_acceleration(values: np.ndarray, dt: float) -> tuple[float, float]:
-    """Return acceleration cost and max acceleration magnitude."""
-
-    arr = _as_trajectory(values)
-    if arr.shape[0] < 3:
-        return 0.0, 0.0
-    acceleration = np.diff(arr, n=2, axis=0) / float(dt) ** 2
-    norm = np.linalg.norm(acceleration, axis=1)
-    return float(np.mean(norm**2) * dt), float(np.max(norm))
-
-
-def trajectory_smoothness_jerk(values: np.ndarray, dt: float) -> tuple[float, float]:
-    """Return jerk cost and max jerk magnitude."""
-
-    arr = _as_trajectory(values)
-    if arr.shape[0] < 4:
-        return 0.0, 0.0
-    jerk = np.diff(arr, n=3, axis=0) / float(dt) ** 3
-    norm = np.linalg.norm(jerk, axis=1)
-    return float(np.mean(norm**2) * dt), float(np.max(norm))
-
 
 def _summarize_scope(
     values: np.ndarray,
     dt: float,
     scope: SmoothnessScopeConfig,
 ) -> ArmSmoothnessSummary:
+    """Compute summary metrics for one configured smoothness scope."""
+
     acceleration_cost, max_acceleration = trajectory_smoothness_acceleration(values, dt)
     jerk_cost, max_jerk = trajectory_smoothness_jerk(values, dt)
     warnings: list[str] = []
@@ -143,14 +107,3 @@ def _extract_scope(frames: list[PolicyFrame], source: str) -> np.ndarray:
         arm = frame.left if side == "left" else frame.right
         rows.append(getattr(arm, field))
     return np.asarray(rows, dtype=np.float64)
-
-
-def _as_trajectory(values: np.ndarray) -> np.ndarray:
-    """Validate and normalize trajectory arrays."""
-
-    arr = np.asarray(values, dtype=np.float64)
-    if arr.ndim == 1:
-        arr = arr.reshape(-1, 1)
-    if arr.ndim != 2:
-        raise ValueError(f"trajectory values must be 2D, got {arr.shape}")
-    return arr
